@@ -1,89 +1,70 @@
-name: Build EMBO (System Qt)
+name: Build EMBO (Stable)
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-22.04, windows-2022, macos-12]
+        os: [ubuntu-22.04, macos-12, windows-2022]
+
     runs-on: ${{ matrix.os }}
 
     steps:
-    - uses: actions/checkout@v4
+    # ---------------- CHECKOUT ----------------
+    - name: Checkout repository
+      uses: actions/checkout@v4
       with:
         lfs: true
 
-    # Ensure a known Python runtime is present (helps actions that rely on python)
-    - name: Setup Python (ensure runtime)
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-
-    # Debug python / environment early so we can capture the failure reason
-    - name: Debug Python (Linux/macOS)
-      if: matrix.os == 'ubuntu-22.04' || matrix.os == 'macos-12'
-      run: |
-        whoami
-        uname -a
-        python3 --version || python --version
-        which python3 || which python || echo "no python found in PATH"
-        echo "PATH=$PATH"
-
-    - name: Debug Python (Windows)
-      if: matrix.os == 'windows-2022'
-      run: |
-        Write-Host "User: $(whoami)"
-        Write-Host "OS info:"
-        Get-CimInstance Win32_OperatingSystem | Select-Object Caption, OSArchitecture
-        python --version
-        where.exe python || Write-Host "no python found in PATH"
-        Write-Host "PATH=$env:PATH"
-      shell: pwsh
-
-    # -------- Linux --------
-    - name: Install Qt (Linux)
+    # ---------------- LINUX ----------------
+    - name: Install dependencies (Linux)
       if: matrix.os == 'ubuntu-22.04'
       run: |
         sudo apt update
         sudo apt install -y \
+          build-essential \
           qtbase5-dev \
-          qt5serialport-dev \
-          libfftw3-dev \
-          build-essential
+          qttools5-dev-tools \
+          libqt5serialport5 \
+          libgl1-mesa-dev \
+          libfftw3-dev
 
-    # -------- macOS --------
-    - name: Install Qt (macOS)
+    # ---------------- MACOS ----------------
+    - name: Install dependencies (macOS)
       if: matrix.os == 'macos-12'
       run: |
         brew update
         brew install qt@5 fftw
         echo "$(brew --prefix qt@5)/bin" >> $GITHUB_PATH
 
-    # -------- Windows --------
-    - name: Install Qt (Windows)
+    # ---------------- WINDOWS ----------------
+    - name: Install dependencies (Windows)
       if: matrix.os == 'windows-2022'
-      uses: jurplel/install-qt-action@v2
-      with:
-        version: '5.15.2'
-        # optionally specify arch or host if needed, e.g. host: windows, arch: x64
+      run: |
+        choco install -y qt5-default fftw
 
-    - name: Setup MSVC
+    - name: Setup MSVC (Windows)
       if: matrix.os == 'windows-2022'
       uses: ilammy/msvc-dev-cmd@v1
 
-    # -------- Build --------
+    # ---------------- BUILD ----------------
     - name: Build EMBO
+      shell: bash
       run: |
         cd src/software/EMBO
         qmake
-        make -j$(nproc || sysctl -n hw.ncpu)
+        make -j2 || mingw32-make -j2
 
+    # ---------------- ARTIFACTS ----------------
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
         name: EMBO-${{ matrix.os }}
-        path: src/software/EMBO
+        path: |
+          src/software/EMBO
