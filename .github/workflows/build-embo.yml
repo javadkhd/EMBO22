@@ -51,7 +51,7 @@ jobs:
         sudo apt update
         sudo apt install -y \
           qtbase5-dev \
-          qtserialport-dev \
+          qt5serialport-dev \
           libfftw3-dev \
           build-essential
 
