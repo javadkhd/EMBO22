@@ -11,12 +11,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, macos-12, windows-2022]
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
 
     steps:
-    # ---------------- CHECKOUT ----------------
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
@@ -24,42 +24,121 @@ jobs:
 
     # ---------------- LINUX ----------------
     - name: Install dependencies (Linux)
-      if: matrix.os == 'ubuntu-22.04'
+      if: matrix.os == 'ubuntu-latest'
       run: |
-        sudo apt update
-        sudo apt install -y \
+        set -euo pipefail
+        sudo apt-get update
+        # Install build tools, Qt qmake and dev libraries, FFTW and pkg-config
+        sudo apt-get install -y \
           build-essential \
+          qt5-qmake \
           qtbase5-dev \
           qttools5-dev-tools \
-          libqt5serialport5 \
+          libqt5serialport5-dev \
           libgl1-mesa-dev \
-          libfftw3-dev
+          libfftw3-dev \
+          pkg-config
 
     # ---------------- MACOS ----------------
     - name: Install dependencies (macOS)
-      if: matrix.os == 'macos-12'
+      if: matrix.os == 'macos-latest'
       run: |
+        set -euo pipefail
         brew update
-        brew install qt@5 fftw
+        # Install Qt 5 and FFTW; pkg-config helps qmake find libraries
+        brew install qt@5 fftw pkg-config || true
+        # Put Qt 5 binaries on PATH for the rest of the job
         echo "$(brew --prefix qt@5)/bin" >> $GITHUB_PATH
+        # Verify qmake is available
+        if ! command -v qmake >/dev/null 2>&1; then
+          echo "qmake not found after installing qt@5. PATH set to $(brew --prefix qt@5)/bin"
+          exit 1
+        fi
 
     # ---------------- WINDOWS ----------------
     - name: Install dependencies (Windows)
-      if: matrix.os == 'windows-2022'
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
       run: |
-        choco install -y qt5-default fftw
+        $ErrorActionPreference = 'Stop'
+        # Install Visual C++ build tools if not present (Chocolatey package)
+        choco install -y visualcpp-build-tools || Write-Host "visualcpp-build-tools may already be present"
+        # Try installing Qt 5 via Chocolatey — package names/versions may vary across chocolatey/community packages
+        choco install -y qt5 --version=5.15.2 || choco install -y qt --version=5.15.2 || Write-Host "Qt install via choco failed or not available; runner may already include Qt"
+        # Attempt FFTW install if available in choco
+        choco install -y fftw || Write-Host "fftw not available via choco or install failed"
+        # Refresh environment variables (from Chocolatey)
+        refreshenv
 
-    - name: Setup MSVC (Windows)
-      if: matrix.os == 'windows-2022'
-      uses: ilammy/msvc-dev-cmd@v1
+        # Try to find qmake.exe in PATH or common Qt locations
+        $qmake = Get-Command qmake.exe -ErrorAction SilentlyContinue
+        if (-not $qmake) {
+          Write-Host "qmake not found on PATH. Searching common Qt install directories..."
+          $found = Get-ChildItem -Path 'C:\Program Files\Qt','C:\Qt','C:\Program Files (x86)\Qt' -Filter qmake.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($found) {
+            $qmakePath = Split-Path $found.FullName -Parent
+            Write-Host "Found qmake at $($found.FullName). Adding $qmakePath to PATH"
+            Write-Host "$qmakePath" >> $env:GITHUB_PATH
+            refreshenv
+          } else {
+            Write-Host "Could not find qmake automatically. Listing C:\Qt directories to help debugging:"
+            Get-ChildItem -Path C:\Qt -Directory -Recurse -ErrorAction SilentlyContinue | Select-Object -First 20 | ForEach-Object { Write-Host $_.FullName }
+            throw "qmake was not found on PATH after attempted installation"
+          }
+        } else {
+          Write-Host "qmake found: $($qmake.Path)"
+        }
 
-    # ---------------- BUILD ----------------
-    - name: Build EMBO
+    # ---------------- BUILD (Linux / macOS) ----------------
+    - name: Build EMBO (Linux / macOS)
+      if: ${{ matrix.os != 'windows-latest' }}
       shell: bash
       run: |
+        set -euo pipefail
         cd src/software/EMBO
+        if ! command -v qmake >/dev/null 2>&1; then
+          echo "qmake not found; aborting build"
+          exit 1
+        fi
         qmake
-        make -j2 || mingw32-make -j2
+        # Use available CPU cores for make
+        if command -v nproc >/dev/null 2>&1; then
+          CORES=$(nproc)
+        else
+          CORES=2
+        fi
+        make -j"$CORES"
+
+    # ---------------- BUILD (Windows) ----------------
+    - name: Setup MSVC environment (Windows)
+      if: matrix.os == 'windows-latest'
+      uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Build EMBO (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = 'Stop'
+        cd src/software/EMBO
+
+        # Ensure qmake is available
+        $qmakeCmd = Get-Command qmake.exe -ErrorAction SilentlyContinue
+        if (-not $qmakeCmd) {
+          throw "qmake not found; cannot build on Windows"
+        }
+
+        & $qmakeCmd.Path
+
+        # Prefer nmake (MSVC) if present, otherwise mingw32-make
+        if (Get-Command nmake.exe -ErrorAction SilentlyContinue) {
+          Write-Host "Using nmake (MSVC)"
+          nmake
+        } elseif (Get-Command mingw32-make.exe -ErrorAction SilentlyContinue) {
+          Write-Host "Using mingw32-make"
+          mingw32-make -j2
+        } else {
+          throw "No make tool found (nmake or mingw32-make). Install Visual C++ build tools or MinGW."
+        }
 
     # ---------------- ARTIFACTS ----------------
     - name: Upload artifacts
