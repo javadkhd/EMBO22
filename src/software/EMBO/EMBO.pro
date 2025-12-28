@@ -1,4 +1,4 @@
-QT       += core gui network serialport help
+QT       += core gui network serialport
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets printsupport
 
@@ -32,6 +32,7 @@ LINUX_LIB_DIR = ubuntu_18
 MACOS_LIB_DIR = mac_10.15
 
 win32 {
+    QT += help
 
     include(__crashhandler/qBreakpad.pri)
 
