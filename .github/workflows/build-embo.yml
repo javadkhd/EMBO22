@@ -61,29 +61,105 @@ jobs:
     # =================================================
     # ================= WINDOWS =======================
     # =================================================
-    - name: Download Qt 5.15.2 MinGW 64-bit
+    # =================================================
+    # ================= WINDOWS =======================
+    # =================================================
+    - name: Install Qt (Windows - Complete Kit)
       if: matrix.os == 'windows-latest'
-      shell: powershell
+      shell: pwsh
       run: |
-        $QtUrl = "https://download.qt.io/archive/qt/5.15/5.15.2/qt-opensource-windows-x86_64-5.15.2.exe"
-        Invoke-WebRequest $QtUrl -OutFile qt-installer.exe
-        Start-Process qt-installer.exe -ArgumentList "/S /D=C:\Qt\5.15.2\mingw81_64" -Wait
+        # 1. دانلود و استخراج نسخه آفلاین Qt 5.15.2 برای MSVC 2019 64-bit
+        #    این فایل حاوی تمام اجزای اصلی (qtbase, serialport, help, qttools) است.
+        $QtInstallerUrl = "https://download.qt.io/archive/qt/5.15/5.15.2/qt-opensource-windows-x86-5.15.2.exe"
+        $InstallerPath = "$env:RUNNER_TEMP\qt-installer.exe"
+        
+        Write-Host "Downloading Qt offline installer..."
+        Invoke-WebRequest -Uri $QtInstallerUrl -OutFile $InstallerPath
+        
+        # 2. نصب خودکار Qt با استفاده از فایل پیکربندی (پارامترها برای نصب silent و کامل)
+        $ConfigScriptPath = "$env:GITHUB_WORKSPACE\qt_install_script.qs"
+        
+        @"
+        function Controller() {
+            installer.autoRejectMessageBoxes();
+            installer.installationFinished.connect(function() {
+                gui.clickButton(buttons.NextButton);
+            })
+        }
+        Controller.prototype.WelcomePageCallback = function() {
+            gui.clickButton(buttons.NextButton);
+        }
+        Controller.prototype.CredentialsPageCallback = function() {
+            gui.clickButton(buttons.NextButton);
+        }
+        Controller.prototype.IntroductionPageCallback = function() {
+            gui.clickButton(buttons.NextButton);
+        }
+        Controller.prototype.TargetDirectoryPageCallback = function() {
+            gui.currentPageWidget().TargetDirectoryLineEdit.setText("C:\\Qt\\5.15.2");
+            gui.clickButton(buttons.NextButton);
+        }
+        Controller.prototype.ComponentSelectionPageCallback = function() {
+            # انتخاب کامپوننت‌های مورد نیاز: MSVC 2019 64-bit و Sources
+            var widget = gui.currentPageWidget();
+            # لغو انتخاب تمام کامپوننت‌ها
+            widget.deselectAll();
+            # انتخاب کامپوننت MSVC 2019 64-bit (نام دقیق آن در این نسخه)
+            widget.selectComponent("qt.qt5.5152.win64_msvc2019_64");
+            # انتخاب کامپوننت Sources برای داشتن qmake و غیره
+            widget.selectComponent("qt.qt5.5152.src");
+            gui.clickButton(buttons.NextButton);
+        }
+        Controller.prototype.LicenseAgreementPageCallback = function() {
+            gui.currentPageWidget().AcceptLicenseRadioButton.setChecked(true);
+            gui.clickButton(buttons.NextButton);
+        }
+        Controller.prototype.StartMenuDirectoryPageCallback = function() {
+            gui.clickButton(buttons.NextButton);
+        }
+        Controller.prototype.ReadyForInstallationPageCallback = function() {
+            gui.clickButton(buttons.NextButton);
+        }
+        Controller.prototype.FinishedPageCallback = function() {
+            var checkBox = gui.currentPageWidget().LaunchQtCreatorCheckBox;
+            if (checkBox && checkBox.checked) {
+                checkBox.checked = false;
+            }
+            gui.clickButton(buttons.FinishButton);
+        }
+        "@ | Out-File -FilePath $ConfigScriptPath -Encoding UTF8
+        
+        Write-Host "Installing Qt silently..."
+        Start-Process -Wait -FilePath $InstallerPath -ArgumentList "--script", $ConfigScriptPath, "--verbose", "--no-force-installations"
+        
+        # 3. تنظیم متغیرهای محیطی برای دسترسی به qmake و کامپایلر
+        $QtPath = "C:\Qt\5.15.2\msvc2019_64"
+        echo "QT_DIR=$QtPath" >> $env:GITHUB_ENV
+        echo "QMAKE=$QtPath\bin\qmake.exe" >> $env:GITHUB_ENV
+        echo "PATH=$QtPath\bin;$env:PATH" >> $env:GITHUB_ENV
+        
+        # 4. نصب Microsoft Build Tools (برای دسترسی به nmake و کامپایلر MSVC)
+        Write-Host "Installing MSVC Build Tools..."
+        choco install -y visualstudio2019buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --quiet"
     
-    - name: Set Qt PATH
+    - name: Copy Windows-specific Libraries
       if: matrix.os == 'windows-latest'
-      shell: powershell
+      shell: pwsh
       run: |
-        echo "C:\Qt\5.15.2\mingw81_64\bin" >> $Env:GITHUB_PATH
-    
-    - name: Provide fake qBreakpad
-      if: matrix.os == 'windows-latest'
-      shell: bash
-      run: |
-        mkdir -p src/software/EMBO/lib/win64
-        cd src/software/EMBO/lib/win64
-        echo "void qBreakpad_stub(){}" > stub.c
-        gcc -c stub.c -o stub.o
-        ar rcs libqBreakpad.a stub.o
+        # بررسی وجود کتابخانه‌های Breakpad و FFTW در مخزن پروژه و کپی آن‌ها
+        $LibSourcePath = "$env:GITHUB_WORKSPACE\src\software\EMBO\lib"
+        
+        if (Test-Path "$LibSourcePath\win64") {
+            Write-Host "Copying win64 libraries..."
+            Copy-Item -Path "$LibSourcePath\win64\*" -Destination "$env:GITHUB_WORKSPACE\src\software\EMBO\" -Recurse -Force
+        }
+        elseif (Test-Path "$LibSourcePath\win32") {
+            Write-Host "Copying win32 libraries..."
+            Copy-Item -Path "$LibSourcePath\win32\*" -Destination "$env:GITHUB_WORKSPACE\src\software\EMBO\" -Recurse -Force
+        }
+        else {
+            Write-Host "Warning: No pre-built Windows libraries found in lib/ directory."
+        }
 
 
     # =================================================
