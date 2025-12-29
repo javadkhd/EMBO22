@@ -67,7 +67,8 @@ jobs:
       with:
         version: '5.15.2'
         arch: 'win64_msvc2022_64'
-        modules: qtbase qttools serialport qthelp
+        modules: qtbase qttools qtserialport qthelp
+        setup-python: false
 
     # =================================================
     # ================= BUILD =========================
