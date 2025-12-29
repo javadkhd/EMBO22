@@ -67,10 +67,28 @@ jobs:
       run: |
         $ErrorActionPreference = "Stop"
     
+        # نصب Qt و ابزارها
         choco install -y qt5 --version=5.15.2
         choco install -y zip
     
-        refresh
+        # بروزرسانی environment variables
+        refreshenv
+    
+        # پیدا کردن qmake
+        $qmake = Get-Command qmake.exe -ErrorAction SilentlyContinue
+        if (-not $qmake) {
+          # بررسی مسیرهای رایج نصب qt توسط choco
+          $qtPath = "C:\tools\Qt\5.15.2\msvc2019_64\bin"
+          if (Test-Path $qtPath) {
+            Write-Host "qmake found in $qtPath"
+            Write-Host $qtPath >> $env:GITHUB_PATH
+            refreshenv
+          } else {
+            throw "Qt path not found: $qtPath"
+          }
+        } else {
+          Write-Host "qmake found: $($qmake.Path)"
+        }
 
 
     # =================================================
