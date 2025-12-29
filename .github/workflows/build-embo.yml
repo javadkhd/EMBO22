@@ -61,15 +61,22 @@ jobs:
     # =================================================
     # ================= WINDOWS =======================
     # =================================================
-    - name: Install Qt (Windows)
+    
+    - name: Install Qt (Windows - Direct Method)
       if: matrix.os == 'windows-latest'
-      uses: jurplel/install-qt-action@v3
-      with:
-        version: '5.15.2'
-        arch: 'win64_msvc2022_64'
-        modules: qtbase qttools qtserialport qthelp
-        setup-python: false
-
+      shell: pwsh
+      run: |
+        # نصب aqtinstall با pip
+        python -m pip install aqtinstall
+        
+        # نصب Qt 5.15.2 با معماری درست
+        python -m aqt install-qt windows desktop 5.15.2 win64_msvc2019_64 -m qtbase qttools qtserialport
+        
+        # تنظیم متغیرهای محیطی
+        $QtPath = "C:\Qt\5.15.2\msvc2019_64"
+        echo "QT_DIR=$QtPath" >> $env:GITHUB_ENV
+        echo "PATH=$QtPath\bin;$env:PATH" >> $env:GITHUB_ENV
+        echo "QMAKE=$QtPath\bin\qmake.exe" >> $env:GITHUB_ENV
     # =================================================
     # ================= BUILD =========================
     # =================================================
