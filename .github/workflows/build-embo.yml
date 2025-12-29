@@ -1,4 +1,4 @@
-name: Build EMBO (Standalone + Zip)
+name: Build EMBO (Release)
 
 on:
   push:
@@ -14,99 +14,134 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 180
+    timeout-minutes: 90
 
     steps:
+    # ------------------------------------------------
+    # Checkout
+    # ------------------------------------------------
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
         lfs: true
 
-    # ---------------- LINUX ----------------
+    # =================================================
+    # ================= LINUX =========================
+    # =================================================
     - name: Install dependencies (Linux)
       if: matrix.os == 'ubuntu-latest'
       run: |
-        set -euo pipefail
+        set -e
         sudo apt-get update
-        sudo apt-get install -y build-essential qt5-qmake qtbase5-dev qttools5-dev-tools libqt5serialport5-dev libgl1-mesa-dev libfftw3-dev pkg-config
+        sudo apt-get install -y \
+          build-essential \
+          qtbase5-dev \
+          qt5-qmake \
+          qttools5-dev-tools \
+          libqt5serialport5-dev \
+          libgl1-mesa-dev \
+          libfftw3-dev \
+          pkg-config \
+          zip
 
-    # ---------------- MACOS ----------------
+    # =================================================
+    # ================= macOS =========================
+    # =================================================
     - name: Install dependencies (macOS)
       if: matrix.os == 'macos-latest'
       run: |
-        set -euo pipefail
+        set -e
         brew update
-        brew install qt@5 fftw pkg-config || true
-        echo "$(brew --prefix qt@5)/bin" >> $GITHUB_PATH
-        if ! command -v qmake >/dev/null 2>&1; then
-          echo "qmake not found; aborting"
-          exit 1
-        fi
+        brew install qt@5 fftw pkg-config zip
 
-    # ---------------- WINDOWS ----------------
+        echo "$(brew --prefix qt@5)/bin" >> $GITHUB_PATH
+        echo "CMAKE_PREFIX_PATH=$(brew --prefix qt@5)" >> $GITHUB_ENV
+        echo "PKG_CONFIG_PATH=$(brew --prefix fftw)/lib/pkgconfig" >> $GITHUB_ENV
+
+    # =================================================
+    # ================= WINDOWS =======================
+    # =================================================
     - name: Install dependencies (Windows)
       if: matrix.os == 'windows-latest'
       shell: pwsh
       run: |
-        $ErrorActionPreference = 'Stop'
-        choco install -y visualcpp-build-tools || Write-Host "Visual C++ tools may exist"
-        # مسیر qmake باید به PATH اضافه شود
-        $qtDirs = @(
-          "C:\Qt\5.15.2\msvc2019_64\bin",
-          "C:\Qt\5.15.2\mingw81_64\bin"
-        )
-        foreach ($d in $qtDirs) {
-          if (Test-Path $d) {
-            Write-Host "Adding $d to PATH"
-            echo $d >> $env:GITHUB_PATH
-          }
-        }
+        $ErrorActionPreference = "Stop"
+
+        choco install -y qt5 --version=5.15.2
+        choco install -y fftw
+        choco install -y zip
+
         refreshenv
-        if (-not (Get-Command qmake.exe -ErrorAction SilentlyContinue)) {
-          Write-Host "qmake not found; Windows build may not produce static executable."
+
+        $qmake = Get-Command qmake.exe -ErrorAction SilentlyContinue
+        if (-not $qmake) {
+          throw "qmake not found on Windows runner"
         }
 
-    # ---------------- BUILD ----------------
+    # =================================================
+    # ================= BUILD =========================
+    # =================================================
     - name: Build EMBO
       shell: bash
       run: |
         set -euo pipefail
         cd src/software/EMBO
-        if command -v qmake >/dev/null 2>&1; then
-          qmake CONFIG+=release
-        else
-          echo "qmake not found; skipping qmake step"
-        fi
-        CORES=$(nproc || echo 2)
-        make -j"$CORES" || true  # ادامه حتی اگر make نیمه موفق باشد
 
-    # ---------------- PACKAGE ----------------
-    - name: Package binaries
+        echo "=== qmake version ==="
+        qmake --version
+
+        echo "=== Running qmake ==="
+        qmake CONFIG+=release
+
+        echo "=== Building ==="
+        if command -v nproc >/dev/null 2>&1; then
+          CORES=$(nproc)
+        else
+          CORES=2
+        fi
+
+        make -j"$CORES"
+
+    # =================================================
+    # ============== PACKAGE BINARIES =================
+    # =================================================
+    - name: Package binaries (Linux / macOS)
+      if: matrix.os != 'windows-latest'
       shell: bash
       run: |
+        set -e
         cd src/software/EMBO
-        mkdir -p dist
-        # Copy all binaries and required libraries to dist/
-        cp EMBO dist/ || true
-        # Linux: copy shared libs
-        if [[ "$(uname)" == "Linux" ]]; then
-          cp /usr/lib/x86_64-linux-gnu/libfftw3.so* dist/ || true
-        fi
-        # MacOS: copy dylibs if exist
-        if [[ "$(uname)" == "Darwin" ]]; then
-          cp /opt/homebrew/opt/fftw/lib/libfftw3*.dylib dist/ || true
-        fi
-        # Windows: copy dlls
-        if [[ "$(uname -o)" == "Msys" || "$(uname -o)" == "Cygwin" ]]; then
-          cp *.dll dist/ || true
-        fi
-        # Zip the folder
-        zip -r EMBO-${{ matrix.os }}-dist.zip dist
 
-    # ---------------- ARTIFACT ----------------
-    - name: Upload artifact
+        mkdir -p package
+        cp build/*/EMBO package/ || true
+        cp -r resources package/ || true
+
+        if [[ "$RUNNER_OS" == "macOS" ]]; then
+          macdeployqt package/EMBO.app -verbose=2 || true
+        fi
+
+        zip -r EMBO-${{ matrix.os }}.zip package
+
+    - name: Package binaries (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
+      run: |
+        Set-StrictMode -Version Latest
+
+        cd src/software/EMBO
+        mkdir package
+
+        Copy-Item build\windows\*\EMBO.exe package\
+        Copy-Item *.dll package\ -ErrorAction SilentlyContinue
+
+        Compress-Archive package EMBO-windows.zip
+
+    # =================================================
+    # ================= ARTIFACT ======================
+    # =================================================
+    - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: EMBO-Standalone-${{ matrix.os }}
+        name: EMBO-${{ matrix.os }}
         path: |
-          src/software/EMBO/EMBO-${{ matrix.os }}-dist.zip
+          src/software/EMBO/*.zip
