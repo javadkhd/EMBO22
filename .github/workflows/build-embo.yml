@@ -92,13 +92,15 @@ jobs:
 
         make -j"$CORES"
     
-    - name: Build EMBO (Windows)
+    - name: Build EMBO (Windows - MinGW)
       if: matrix.os == 'windows-latest'
-      shell: pwsh
+      shell: bash
       run: |
+        set -e
         cd src/software/EMBO
-        qmake CONFIG+=release CI_BUILD=1
-        nmake
+    
+        qmake CONFIG+=release
+        mingw32-make -j2
 
 
     # =================================================
