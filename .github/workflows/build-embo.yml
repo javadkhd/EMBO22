@@ -61,23 +61,13 @@ jobs:
     # =================================================
     # ================= WINDOWS =======================
     # =================================================
-    - name: List Available Modules for Qt 5.15.2 win64_msvc2019_64
-      if: matrix.os == 'windows-latest'
-      shell: pwsh
-      run: |
-        Write-Host "Checking available modules for Qt 5.15.2 win64_msvc2019_64..."
-        # ابتدا aqtinstall را در این گام نصب کن
-        python -m pip install aqtinstall
-        # حالا دستور لیست ماژول‌ها را اجرا کن
-        python -m aqt list-qt windows desktop --modules 5.15.2 win64_msvc2019_64
     - name: Install Qt (Windows)
       if: matrix.os == 'windows-latest'
       uses: jurplel/install-qt-action@v3
       with:
         version: '5.15.2'
         arch: 'win64_msvc2019_64'
-        # ماژول‌ها با پیشوند qt. امتحان می‌شوند
-        modules: 'qt.qt5.5152.win64_msvc2019_64 qt.tools qt.serialport'
+        # پارامتر modules را حذف کرده‌ایم
         setup-python: false
     
     # =================================================
