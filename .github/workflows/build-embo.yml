@@ -66,24 +66,38 @@ jobs:
       if: matrix.os == 'windows-latest'
       shell: pwsh
       run: |
-        # نصب MinGW
+        # 1. نصب MinGW
         choco install -y mingw
     
-        # نصب Qt 5.15.2 MinGW 64-bit
+        # 2. نصب pip و aqtinstall
         python -m pip install --upgrade pip
         python -m pip install aqtinstall
     
+        # 3. نصب Qt 5.15.2 MinGW 64-bit با ماژول‌های لازم
         python -m aqt install-qt windows desktop 5.15.2 win64_mingw81 --outputdir D:/a/EMBO22/Qt --modules qtbase qttools qthelp serialport
     
-        # اضافه کردن Qt به PATH
-        echo "D:/a/EMBO22/Qt/5.15.2/mingw81_64/bin" >> $env:GITHUB_PATH
+        # 4. اضافه کردن Qt به PATH و متغیرهای محیطی
+        $QtPath = "D:/a/EMBO22/Qt/5.15.2/mingw81_64"
+        echo "QT_DIR=$QtPath" >> $env:GITHUB_ENV
+        echo "QMAKE=$QtPath/bin/qmake.exe" >> $env:GITHUB_ENV
+        echo "PATH=$QtPath/bin;$env:PATH" >> $env:GITHUB_ENV
     
-        # ساخت stub برای qBreakpad (برای CI)
-        mkdir -p src/software/EMBO/lib/win64
-        cd src/software/EMBO/lib/win64
+        # 5. ساخت پوشه lib/win64 اگر وجود ندارد
+        if (!(Test-Path "$env:GITHUB_WORKSPACE/src/software/EMBO/lib/win64")) {
+            New-Item -ItemType Directory -Path "$env:GITHUB_WORKSPACE/src/software/EMBO/lib/win64"
+        }
+    
+        # 6. ساخت stub برای libqBreakpad.a تا linker خطا ندهد
+        cd "$env:GITHUB_WORKSPACE/src/software/EMBO/lib/win64"
         echo "void qBreakpad_stub(){}" > stub.c
         gcc -c stub.c -o stub.o
         ar rcs libqBreakpad.a stub.o
+    
+        # 7. کپی کتابخانه‌ها و DLL پروژه
+        $LibSourcePath = "$env:GITHUB_WORKSPACE/src/software/EMBO/lib"
+        if (Test-Path "$LibSourcePath/win64") {
+            Copy-Item -Path "$LibSourcePath/win64/*" -Destination "$env:GITHUB_WORKSPACE/src/software/EMBO/" -Recurse -Force -ErrorAction SilentlyContinue
+        }
 
 
     
