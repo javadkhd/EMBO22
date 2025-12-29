@@ -61,9 +61,9 @@ jobs:
     # =================================================
     # ================= WINDOWS =======================
     # =================================================
-    - name: Install MinGW (Windows)
-      if: matrix.os == 'windows-latest'
-      # run: choco install mingw -y
+    # - name: Install MinGW (Windows)
+    #   if: matrix.os == 'windows-latest'
+    #   # run: choco install mingw -y
     
     - name: Install Qt (Windows - MinGW)
       if: matrix.os == 'windows-latest'
