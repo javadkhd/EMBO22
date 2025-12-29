@@ -69,7 +69,7 @@ jobs:
 
         python -m aqt install-qt windows desktop 5.15.2 win64_mingw81 `
           --outputdir $env:GITHUB_WORKSPACE/Qt `
-          # --modules qttools5 QSerialPort
+          --modules qttools5 QSerialPort
 
         echo "$env:GITHUB_WORKSPACE/Qt/5.15.2/mingw81_64/bin" >> $env:GITHUB_PATH
 
@@ -80,7 +80,7 @@ jobs:
       if: matrix.os == 'ubuntu-latest'
       shell: bash
       run: |
-        set -euo pipefail
+        set -e
         cd src/software/EMBO
         qmake CONFIG+=release
         make -j$(nproc)
