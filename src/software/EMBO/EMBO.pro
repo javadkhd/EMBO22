@@ -1,127 +1,135 @@
-QT       += core gui network serialport
-
+QT += core gui network serialport
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets printsupport
 
-CONFIG += c++11
+CONFIG += c++11 release
+TEMPLATE = app
 
 VERSION = 0.1.5
 MIN_FW = 0.2.3
 
-DEFINES += APP_VERSION=\\\"$$VERSION\\\"
-DEFINES += MIN_FW_VER=\\\"$$MIN_FW\\\"
-
-# The following define makes your compiler emit warnings if you use
-# any Qt feature that has been marked deprecated (the exact warnings
-# depend on your compiler). Please consult the documentation of the
-# deprecated API in order to know how to port your code away from it.
+DEFINES += APP_VERSION=\"$$VERSION\"
+DEFINES += MIN_FW_VER=\"$$MIN_FW\"
 DEFINES += QT_DEPRECATED_WARNINGS
 
 win32:RC_ICONS = icon.ico
 macx: ICON = icon.icns
 
-
-greaterThan(QT_MAJOR_VERSION, 4){
-    TARGET_ARCH=$${QT_ARCH}
-}else{
-    TARGET_ARCH=$${QMAKE_HOST.arch}
+# -------------------------------------------------
+# Architecture detection
+# -------------------------------------------------
+greaterThan(QT_MAJOR_VERSION, 4) {
+    TARGET_ARCH = $$QT_ARCH
+} else {
+    TARGET_ARCH = $$QMAKE_HOST.arch
 }
 
+# -------------------------------------------------
+# Updater
+# -------------------------------------------------
 include(__updater/QSimpleUpdater.pri)
 
-LINUX_LIB_DIR = ubuntu_18
-MACOS_LIB_DIR = mac_10.15
-
+# =================================================
+# ================ WINDOWS ========================
+# =================================================
 win32 {
-    QT += help
 
+    QT += help
     include(__crashhandler/qBreakpad.pri)
 
     contains(TARGET_ARCH, x86_64) {
-
         ARCHITECTURE = win64
+        DESTDIR = $$PWD/build/windows/x64
         QMAKE_LIBDIR += $$PWD/lib/win64
-        LIBS += $$PWD/lib/win64/libfftw3-3.dll
         LIBS += $$PWD/lib/win64/libqBreakpad.a
-
-        CONFIG(release, debug|release): DESTDIR = $$PWD/build-win64/release
-        CONFIG(debug, debug|release): DESTDIR = $$PWD/build-win64/debug
-
-        inst.files += $$PWD/lib/win64/libfftw3-3.dll
-        inst.path += $${DESTDIR}
-        INSTALLS += inst
-
+        INSTALL_DLL = $$PWD/lib/win64/libfftw3-3.dll
     } else {
-
         ARCHITECTURE = win32
+        DESTDIR = $$PWD/build/windows/x86
         QMAKE_LIBDIR += $$PWD/lib/win32
-        LIBS += $$PWD/lib/win32/libfftw3-3.dll
         LIBS += $$PWD/lib/win32/libqBreakpad.a
-
-        CONFIG(release, debug|release): DESTDIR = $$PWD/build-win32/release
-        CONFIG(debug, debug|release): DESTDIR = $$PWD/build-win32/debug
-
-        inst.files += $$PWD/lib/win32/libfftw3-3.dll
-        inst.path += $${DESTDIR}
-        INSTALLS += inst
+        INSTALL_DLL = $$PWD/lib/win32/libfftw3-3.dll
     }
-    help.files += "$${PWD}/doc/EMBO.chm" \
-                  "$${PWD}/doc/EMBO.pdf"
-    help.path += $${DESTDIR}/doc
+
+    LIBS += -lfftw3-3
+
+    inst.files = $$INSTALL_DLL
+    inst.path = $$DESTDIR
+    INSTALLS += inst
+
+    help.files += $$PWD/doc/EMBO.chm $$PWD/doc/EMBO.pdf
+    help.path = $$DESTDIR/doc
     INSTALLS += help
 }
 
-linux {
-
-    #include(__crashhandler/qBreakpad.pri)
+# =================================================
+# ================= LINUX =========================
+# =================================================
+unix:!macx {
 
     ARCHITECTURE = linux
-    QMAKE_LIBDIR += $$PWD/lib/$$LINUX_LIB_DIR
-    LIBS += $$PWD/lib/$$LINUX_LIB_DIR/libfftw3.a
-    #LIBS += $$PWD/lib/$$LINUX_LIB_DIR/libqBreakpad.a
+    DESTDIR = $$PWD/build/linux
 
-    CONFIG(release, debug|release): DESTDIR = $$PWD/build/linux/release
-    CONFIG(debug, debug|release): DESTDIR = $$PWD/build/linux/debug
+    CONFIG += link_pkgconfig
+    PKGCONFIG += fftw3
+
+    QMAKE_CXXFLAGS += -fPIC
+
+    # Optional breakpad
+    # include(__crashhandler/qBreakpad.pri)
 }
 
+# =================================================
+# ================= macOS =========================
+# =================================================
 macx {
 
-    include(__crashhandler/qBreakpad.pri)
+    ARCHITECTURE = macos
+    DESTDIR = $$PWD/build/macos
 
-    ARCHITECTURE = mac
-    QMAKE_LIBDIR += $$PWD/lib/$$MACOS_LIB_DIR
+    CONFIG += link_pkgconfig
+    PKGCONFIG += fftw3
+
     LIBS += -framework AppKit
-    LIBS += $$PWD/lib/$$MACOS_LIB_DIR/libfftw3.a
-    LIBS += $$PWD/lib/$$MACOS_LIB_DIR/libqBreakpad.a
 
-    CONFIG(release, debug|release): DESTDIR = $$PWD/build/macx/release
-    CONFIG(debug, debug|release): DESTDIR = $$PWD/build/macx/debug
+    include(__crashhandler/qBreakpad.pri)
 }
 
-#LIBS += -lOpenGL32
-#DEFINES += QCUSTOMPLOT_USE_OPENGL
-
-QMAKE_TARGET_COMPANY = CTU Javad Khadem
-QMAKE_TARGET_PRODUCT = EMBO
-QMAKE_TARGET_DESCRIPTION = EMBedded Oscilloscope
-QMAKE_TARGET_COPYRIGHT = CTU Javad Khadem
-
+# -------------------------------------------------
+# Compiler flags
+# -------------------------------------------------
 QMAKE_CXXFLAGS += -Wno-deprecated -Wno-deprecated-declarations
-QMAKE_POST_LINK=$(MAKE) install
 
-# You can also make your code fail to compile if it uses deprecated APIs.
-# In order to do so, uncomment the following line.
-# You can also select to disable deprecated APIs only up to a certain version of Qt.
-#DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
+# -------------------------------------------------
+# Metadata
+# -------------------------------------------------
+QMAKE_TARGET_COMPANY = "CTU Javad Khadem"
+QMAKE_TARGET_PRODUCT = "EMBO"
+QMAKE_TARGET_DESCRIPTION = "EMBedded Oscilloscope"
+QMAKE_TARGET_COPYRIGHT = "© CTU Javad Khadem"
 
-INCLUDEPATH += src/
-INCLUDEPATH += src/windows/
+# -------------------------------------------------
+# Install target
+# -------------------------------------------------
+unix:!android {
+    target.path = /opt/$$TARGET/bin
+    INSTALLS += target
+}
 
+# -------------------------------------------------
+# Include paths
+# -------------------------------------------------
+INCLUDEPATH += src
+INCLUDEPATH += src/windows
+
+# -------------------------------------------------
+# Sources
+# -------------------------------------------------
 SOURCES += \
     lib/qdial2.cpp \
-    src/core.cpp \
     lib/ctkrangeslider.cpp \
     lib/qcustomplot.cpp \
     src/main.cpp \
+    src/core.cpp \
     src/messages.cpp \
     src/msg.cpp \
     src/qcpcursors.cpp \
@@ -136,15 +144,18 @@ SOURCES += \
     src/windows/window_sgen.cpp \
     src/windows/window_vm.cpp
 
+# -------------------------------------------------
+# Headers
+# -------------------------------------------------
 HEADERS += \
     lib/qdial2.h \
-    src/containers.h \
+    lib/ctkrangeslider.h \
+    lib/qcustomplot.h \
+    lib/fftw3.h \
     src/core.h \
+    src/containers.h \
     src/css.h \
     src/interfaces.h \
-    lib/ctkrangeslider.h \
-    lib/fftw3.h \
-    lib/qcustomplot.h \
     src/messages.h \
     src/movemean.h \
     src/msg.h \
@@ -160,6 +171,9 @@ HEADERS += \
     src/windows/window_sgen.h \
     src/windows/window_vm.h
 
+# -------------------------------------------------
+# UI Forms
+# -------------------------------------------------
 FORMS += \
     src/windows/window__main.ui \
     src/windows/window_cntr.ui \
@@ -169,13 +183,14 @@ FORMS += \
     src/windows/window_sgen.ui \
     src/windows/window_vm.ui
 
-# Default rules for deployment.
-qnx: target.path = /tmp/$${TARGET}/bin
-else: unix:!android: target.path = /opt/$${TARGET}/bin
-!isEmpty(target.path): INSTALLS += target
-
+# -------------------------------------------------
+# Resources
+# -------------------------------------------------
 RESOURCES += resources/resources.qrc
 
+# -------------------------------------------------
+# Distribution files
+# -------------------------------------------------
 DISTFILES += \
     icon.icns \
     icon.ico
