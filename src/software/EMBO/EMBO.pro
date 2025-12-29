@@ -1,10 +1,11 @@
-QT += core gui network serialport help
+QT += core gui network serialport
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets printsupport
 
-CONFIG += c++11
+CONFIG += c++11 release
+TEMPLATE = app
 
 VERSION = 0.1.5
-MIN_FW = 0.2.3
+MIN_FW  = 0.2.3
 
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 DEFINES += MIN_FW_VER=\\\"$$MIN_FW\\\"
@@ -13,93 +14,78 @@ DEFINES += QT_DEPRECATED_WARNINGS
 win32:RC_ICONS = icon.ico
 macx: ICON = icon.icns
 
-greaterThan(QT_MAJOR_VERSION, 4){
-    TARGET_ARCH = $${QT_ARCH}
-}else{
-    TARGET_ARCH = $${QMAKE_HOST.arch}
+# -------------------------------------------------
+# Optional QtHelp
+# -------------------------------------------------
+qtHaveModule(help) {
+    QT += help
+    DEFINES += HAS_QT_HELP
+}
+
+# -------------------------------------------------
+# Disable updater by default (CI-safe)
+# -------------------------------------------------
+!contains(CONFIG, enable_updater) {
+    DEFINES += NO_UPDATER
+} else {
+    exists(__updater/QSimpleUpdater.pri) {
+        include(__updater/QSimpleUpdater.pri)
+    }
+}
+
+# -------------------------------------------------
+# Architecture
+# -------------------------------------------------
+greaterThan(QT_MAJOR_VERSION, 4) {
+    TARGET_ARCH = $$QT_ARCH
+} else {
+    TARGET_ARCH = $$QMAKE_HOST.arch
 }
 
 # =================================================
-# QSimpleUpdater (vendored – CI safe)
+# WINDOWS
 # =================================================
-INCLUDEPATH += $$PWD/src/thirdparty/qsimpleupdater
-
-SOURCES += \
-    src/thirdparty/qsimpleupdater/QSimpleUpdater.cpp
-
-HEADERS += \
-    src/thirdparty/qsimpleupdater/QSimpleUpdater.h
-
-# =================================================
-# Platform specific
-# =================================================
-
-LINUX_LIB_DIR = ubuntu_18
-MACOS_LIB_DIR = mac_10.15
-
 win32 {
-
-    ARCHITECTURE = win64
-    QMAKE_LIBDIR += $$PWD/lib/win64
-    LIBS += $$PWD/lib/win64/libfftw3-3.dll
-
-    CONFIG(release, debug|release): DESTDIR = $$PWD/build/windows/release
-    CONFIG(debug, debug|release): DESTDIR = $$PWD/build/windows/debug
-
-    inst.files += $$PWD/lib/win64/libfftw3-3.dll
-    inst.path += $${DESTDIR}
-    INSTALLS += inst
-
-    help.files += "$${PWD}/doc/EMBO.chm" \
-                  "$${PWD}/doc/EMBO.pdf"
-    help.path += $${DESTDIR}/doc
-    INSTALLS += help
+    ARCHITECTURE = windows
+    DESTDIR = $$PWD/build/windows
 }
 
-linux {
-
+# =================================================
+# LINUX
+# =================================================
+unix:!macx {
     ARCHITECTURE = linux
-    QMAKE_LIBDIR += $$PWD/lib/$$LINUX_LIB_DIR
-    LIBS += $$PWD/lib/$$LINUX_LIB_DIR/libfftw3.a
-
-    CONFIG(release, debug|release): DESTDIR = $$PWD/build/linux/release
-    CONFIG(debug, debug|release): DESTDIR = $$PWD/build/linux/debug
+    DESTDIR = $$PWD/build/linux
+    CONFIG += link_pkgconfig
+    PKGCONFIG += fftw3
 }
 
+# =================================================
+# macOS
+# =================================================
 macx {
-
-    ARCHITECTURE = mac
-    QMAKE_LIBDIR += $$PWD/lib/$$MACOS_LIB_DIR
+    ARCHITECTURE = macos
+    DESTDIR = $$PWD/build/macos
+    CONFIG += link_pkgconfig
+    PKGCONFIG += fftw3
     LIBS += -framework AppKit
-    LIBS += $$PWD/lib/$$MACOS_LIB_DIR/libfftw3.a
-
-    CONFIG(release, debug|release): DESTDIR = $$PWD/build/mac/release
-    CONFIG(debug, debug|release): DESTDIR = $$PWD/build/mac/debug
+    CONFIG += sdk_no_version_check
 }
 
-# =================================================
-# Project metadata
-# =================================================
-
-QMAKE_TARGET_COMPANY = CTU Jakub Parez
-QMAKE_TARGET_PRODUCT = EMBO
-QMAKE_TARGET_DESCRIPTION = EMBedded Oscilloscope
-QMAKE_TARGET_COPYRIGHT = CTU Jakub Parez
-
+# -------------------------------------------------
+# Compiler flags
+# -------------------------------------------------
 QMAKE_CXXFLAGS += -Wno-deprecated -Wno-deprecated-declarations
-QMAKE_POST_LINK = $(MAKE) install
 
-# =================================================
-# Includes
-# =================================================
-
+# -------------------------------------------------
+# Include paths
+# -------------------------------------------------
 INCLUDEPATH += src
 INCLUDEPATH += src/windows
 
-# =================================================
-# Sources / Headers / Forms
-# =================================================
-
+# -------------------------------------------------
+# Sources
+# -------------------------------------------------
 SOURCES += \
     lib/qdial2.cpp \
     lib/ctkrangeslider.cpp \
@@ -125,8 +111,8 @@ HEADERS += \
     lib/ctkrangeslider.h \
     lib/qcustomplot.h \
     lib/fftw3.h \
-    src/containers.h \
     src/core.h \
+    src/containers.h \
     src/css.h \
     src/interfaces.h \
     src/messages.h \
@@ -154,7 +140,3 @@ FORMS += \
     src/windows/window_vm.ui
 
 RESOURCES += resources/resources.qrc
-
-DISTFILES += \
-    icon.icns \
-    icon.ico
