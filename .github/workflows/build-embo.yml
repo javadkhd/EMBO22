@@ -62,21 +62,21 @@ jobs:
     # ================= WINDOWS =======================
     # =================================================
     
-    - name: Install Qt (Windows - Direct Method)
+    - name: Check Available Qt Architectures (Windows)
       if: matrix.os == 'windows-latest'
       shell: pwsh
       run: |
-        # نصب aqtinstall با pip
         python -m pip install aqtinstall
-        
-        # نصب Qt 5.15.2 با معماری درست
-        python -m aqt install-qt windows desktop 5.15.2 win64_msvc2019_64 -m qtbase qttools qtserialport
-        
-        # تنظیم متغیرهای محیطی
-        $QtPath = "C:\Qt\5.15.2\msvc2019_64"
-        echo "QT_DIR=$QtPath" >> $env:GITHUB_ENV
-        echo "PATH=$QtPath\bin;$env:PATH" >> $env:GITHUB_ENV
-        echo "QMAKE=$QtPath\bin\qmake.exe" >> $env:GITHUB_ENV
+        Write-Host "Checking available architectures for Qt 5.15.2 (Windows Desktop)..."
+        python -m aqt list-qt windows desktop --arch 5.15.2
+    - name: Install Qt (Windows)
+      if: matrix.os == 'windows-latest'
+      uses: jurplel/install-qt-action@v3
+      with:
+        version: '5.15.2'
+        arch: 'win64_msvc2019_64' # معماری اصلی را از اینجا تغییر دهید
+        modules: 'qtbase qttools qtserialport'
+        setup-python: false
     # =================================================
     # ================= BUILD =========================
     # =================================================
