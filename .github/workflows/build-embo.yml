@@ -62,14 +62,64 @@ jobs:
     # ================= WINDOWS =======================
     # =================================================
     
+    - name: Setup MSVC environment
+      if: matrix.os == 'windows-latest'
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64  # یا x86 اگر می‌خوای 32 بیتی بسازی
+    
     - name: Install dependencies (Windows)
       if: matrix.os == 'windows-latest'
-      uses: jurplel/install-qt-action@v4
-      with:
-        version: '5.15.2'
-        host: 'windows'
-        target: 'desktop'
-        arch: 'win64_msvc2019_64'
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = "Stop"
+    
+        # نصب zip برای آرشیو
+        choco install -y zip
+    
+        # Refresh environment variables
+        refreshenv
+    
+        # مسیر Qt for MSVC (runner default)
+        $qtPath = "D:\a\EMBO22\Qt\5.15.2\msvc2019_64\bin"
+        if (-not (Test-Path $qtPath)) {
+            throw "Qt path not found: $qtPath"
+        }
+        Write-Host "Adding Qt bin to PATH: $qtPath"
+        $env:PATH = "$qtPath;$env:PATH"
+    
+    - name: Build EMBO (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = "Stop"
+        cd src/software/EMBO
+    
+        # اجرای qmake با MSVC Qt
+        & "$qtPath\qmake.exe" CONFIG+=release
+    
+        # اجرای nmake (MSVC) یا mingw32-make به عنوان fallback
+        if (Get-Command nmake.exe -ErrorAction SilentlyContinue) {
+            Write-Host "Building with nmake"
+            nmake
+        } elseif (Get-Command mingw32-make.exe -ErrorAction SilentlyContinue) {
+            Write-Host "Building with mingw32-make"
+            mingw32-make -j2
+        } else {
+            throw "No make tool found. Install Visual C++ build tools or MinGW."
+        }
+    
+    - name: Package Windows build
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = "Stop"
+        cd src/software/EMBO/build-win64/release
+        if (Test-Path "EMBO.exe") {
+            zip -r EMBO-Windows.zip EMBO.exe *.dll
+        } else {
+            throw "EMBO.exe not found after build"
+        }
 
 
     # =================================================
