@@ -63,32 +63,44 @@ jobs:
     # =================================================
     - name: Install dependencies (Windows)
       if: matrix.os == 'windows-latest'
+      uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x64
+    
+    - name: Install Qt (Windows)
+      if: matrix.os == 'windows-latest'
       shell: pwsh
       run: |
         $ErrorActionPreference = "Stop"
     
-        # نصب Qt و ابزارها
+        # Chocolatey نصب qt5 dll-only
         choco install -y qt5 --version=5.15.2
         choco install -y zip
     
-        # بروزرسانی environment variables
+        # بروزرسانی env
         refreshenv
     
         # پیدا کردن qmake
-        $qmake = Get-Command qmake.exe -ErrorAction SilentlyContinue
-        if (-not $qmake) {
-          # بررسی مسیرهای رایج نصب qt توسط choco
-          $qtPath = "C:\tools\Qt\5.15.2\msvc2019_64\bin"
-          if (Test-Path $qtPath) {
+        $qtPath = "C:\Qt\5.15.2\msvc2019_64\bin"
+        if (Test-Path $qtPath) {
             Write-Host "qmake found in $qtPath"
             Write-Host $qtPath >> $env:GITHUB_PATH
             refreshenv
-          } else {
-            throw "Qt path not found: $qtPath"
-          }
         } else {
-          Write-Host "qmake found: $($qmake.Path)"
+            throw "Qt path not found: $qtPath"
         }
+    
+    - name: Build EMBO (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = "Stop"
+        cd src/software/EMBO
+    
+        # استفاده از qmake و nmake
+        & qmake.exe CONFIG+=release
+        nmake
+
 
 
     # =================================================
