@@ -61,40 +61,32 @@ jobs:
     # =================================================
     # ================= WINDOWS =======================
     # =================================================
-    - name: Install Qt and Build Tools (Windows - Complete)
+    
+    - name: Install Qt and Build Tools (Windows - MinGW)
       if: matrix.os == 'windows-latest'
       shell: pwsh
       run: |
-      
-        # 1. نصب Microsoft Build Tools (شامل کامپایلر MSVC، nmake و...)
-        Write-Host "Installing Microsoft Build Tools (for MSVC 2019)..."
-        choco install -y visualstudio2019buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --quiet --includeRecommended"
+        # نصب MinGW
+        choco install -y mingw
     
-        # 2. نصب Qt به صورت آنلاین
-        Write-Host "Installing Qt 5.15.2..."
+        # نصب Qt 5.15.2 MinGW 64-bit
+        python -m pip install --upgrade pip
         python -m pip install aqtinstall
-        # 3. نصب ماژول اضافی qtserialport (ممکن است در کامپوننت اصلی باشد، ولی برای اطمینان)
-        Write-Host "Installing Qt SerialPort module..."
-        python -m aqt list-qt windows desktop --version 5.15.2 --arch win64_msvc2019_64
-        # python -m aqt install-qt windows desktop 5.15.2 win64_msvc2019_64 -m qtserialport5
-        python -m aqt install-qt windows desktop 5.15.2 win64_msvc2019_64 --outputdir D:/a/EMBO22/Qt --modules qtbase qttools qthelp qtserialport5
     
-        # 4. تنظیم متغیرهای محیطی
-        $QtPath = "C:\Qt\5.15.2\msvc2019_64"
-        echo "QT_DIR=$QtPath" >> $env:GITHUB_ENV
-        echo "QMAKE=$QtPath\bin\qmake.exe" >> $env:GITHUB_ENV
-        echo "PATH=$QtPath\bin;$env:PATH" >> $env:GITHUB_ENV
-        echo "INCLUDE=$env:INCLUDE;C:\Program Files (x86)\Windows Kits\10\Include\10.0.19041.0\um" >> $env:GITHUB_ENV
-        echo "LIB=$env:LIB;C:\Program Files (x86)\Windows Kits\10\Lib\10.0.19041.0\um\x64" >> $env:GITHUB_ENV
+        python -m aqt install-qt windows desktop 5.15.2 win64_mingw81 --outputdir D:/a/EMBO22/Qt --modules qtbase qttools qthelp serialport
     
-        # 5. کپی کتابخانه‌های اختصاصی پروژه (libqBreakpad.a، libfftw3-3.dll)
-        Write-Host "Copying project-specific libraries..."
-        $LibSourcePath = "$env:GITHUB_WORKSPACE\src\software\EMBO\lib"
-        if (Test-Path "$LibSourcePath\win64") {
-            Copy-Item -Path "$LibSourcePath\win64\*" -Destination "$env:GITHUB_WORKSPACE\src\software\EMBO\" -Recurse -Force -ErrorAction SilentlyContinue
-        }
+        # اضافه کردن Qt به PATH
+        echo "D:/a/EMBO22/Qt/5.15.2/mingw81_64/bin" >> $env:GITHUB_PATH
+    
+        # ساخت stub برای qBreakpad (برای CI)
+        mkdir -p src/software/EMBO/lib/win64
+        cd src/software/EMBO/lib/win64
+        echo "void qBreakpad_stub(){}" > stub.c
+        gcc -c stub.c -o stub.o
+        ar rcs libqBreakpad.a stub.o
 
 
+    
     # =================================================
     # ================= BUILD =========================
     # =================================================
