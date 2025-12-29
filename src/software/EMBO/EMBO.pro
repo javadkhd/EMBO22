@@ -50,7 +50,9 @@ win32 {
         INSTALL_DLL = $$PWD/lib/win32/libfftw3-3.dll
     }
 
-    LIBS += -lfftw3-3
+    # فقط مسیر DLL برای run-time اضافه شود، نه نام کتابخانه
+    # چون MSVC با -lfftw3-3 کار نمی‌کند
+    # LIBS += -lfftw3-3
 
     inst.files = $$INSTALL_DLL
     inst.path = $$DESTDIR
@@ -60,6 +62,7 @@ win32 {
     help.path = $$DESTDIR/doc
     INSTALLS += help
 }
+
 
 # =================================================
 # ================= LINUX =========================
