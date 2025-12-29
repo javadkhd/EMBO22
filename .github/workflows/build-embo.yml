@@ -73,11 +73,11 @@ jobs:
         # 2. نصب Qt به صورت آنلاین
         Write-Host "Installing Qt 5.15.2..."
         python -m pip install aqtinstall
-        python -m aqt list-qt windows desktop --modules 5.15.2 <arch>
         # 3. نصب ماژول اضافی qtserialport (ممکن است در کامپوننت اصلی باشد، ولی برای اطمینان)
         Write-Host "Installing Qt SerialPort module..."
-        python -m aqt list-qt windows desktop --version 5.15.2 --arch win64_mingw81
-        python -m aqt install-qt windows desktop 5.15.2 win64_msvc2019_64 -m qtserialport5
+        python -m aqt list-qt windows desktop --version 5.15.2 --arch win64_msvc2019_64
+        # python -m aqt install-qt windows desktop 5.15.2 win64_msvc2019_64 -m qtserialport5
+        python -m aqt install-qt windows desktop 5.15.2 win64_msvc2019_64 --outputdir D:/a/EMBO22/Qt --modules qtbase qttools qthelp qtserialport5
     
         # 4. تنظیم متغیرهای محیطی
         $QtPath = "C:\Qt\5.15.2\msvc2019_64"
