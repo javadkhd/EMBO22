@@ -61,22 +61,16 @@ jobs:
     # =================================================
     # ================= WINDOWS =======================
     # =================================================
+    
     - name: Install dependencies (Windows)
       if: matrix.os == 'windows-latest'
-      shell: pwsh
-      run: |
-        $ErrorActionPreference = "Stop"
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: '5.15.2'
+        host: 'windows'
+        target: 'desktop'
+        arch: 'win64_msvc2019_64'
 
-        choco install -y qt5 --version=5.15.2
-        choco install -y fftw
-        choco install -y zip
-
-        refreshenv
-
-        $qmake = Get-Command qmake.exe -ErrorAction SilentlyContinue
-        if (-not $qmake) {
-          throw "qmake not found on Windows runner"
-        }
 
     # =================================================
     # ================= BUILD =========================
