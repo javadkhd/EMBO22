@@ -61,37 +61,30 @@ jobs:
     # =================================================
     # ================= WINDOWS =======================
     # =================================================
-    
-    - name: Install Qt 5.15.2 (MinGW 64-bit)
+    - name: Download Qt 5.15.2 MinGW 64-bit
       if: matrix.os == 'windows-latest'
-      uses: jurplel/install-qt-action@v3
-      with:
-        version: '5.15.2'
-        arch: 'win64_mingw81'
-        modules: 'qttools serialport qthelp'
-        cache: true
+      shell: powershell
+      run: |
+        $QtUrl = "https://download.qt.io/archive/qt/5.15/5.15.2/qt-opensource-windows-x86_64-5.15.2.exe"
+        Invoke-WebRequest $QtUrl -OutFile qt-installer.exe
+        Start-Process qt-installer.exe -ArgumentList "/S /D=C:\Qt\5.15.2\mingw81_64" -Wait
     
-    - name: Use Qt MinGW toolchain
+    - name: Set Qt PATH
+      if: matrix.os == 'windows-latest'
+      shell: powershell
+      run: |
+        echo "C:\Qt\5.15.2\mingw81_64\bin" >> $Env:GITHUB_PATH
+    
+    - name: Provide fake qBreakpad
       if: matrix.os == 'windows-latest'
       shell: bash
       run: |
-        echo "$Qt5_DIR/../../mingw81_64/bin" >> $GITHUB_PATH
-    
-    - name: Provide fake qBreakpad for CI
-      if: matrix.os == 'windows-latest'
-      shell: bash
-      run: |
-        set -e
-    
-        BREAKPAD_DIR="src/software/EMBO/lib/win64"
-        mkdir -p "$BREAKPAD_DIR"
-        cd "$BREAKPAD_DIR"
-    
+        mkdir -p src/software/EMBO/lib/win64
+        cd src/software/EMBO/lib/win64
         echo "void qBreakpad_stub(){}" > stub.c
         gcc -c stub.c -o stub.o
         ar rcs libqBreakpad.a stub.o
-    
-        echo "Fake libqBreakpad.a created at $BREAKPAD_DIR"
+
 
     # =================================================
     # ================= BUILD =========================
