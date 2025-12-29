@@ -81,6 +81,7 @@ unix:!macx {
 # =================================================
 # ================= macOS =========================
 # =================================================
+
 macx {
 
     ARCHITECTURE = macos
@@ -92,17 +93,12 @@ macx {
     LIBS += -framework AppKit
 
     # ---------------------------------------------
-    # Optional Breakpad support (CI-safe)
+    # !!! Breakpad DISABLED on macOS !!!
     # ---------------------------------------------
-    BREAKPAD_PRI = $$PWD/__crashhandler/qBreakpad.pri
-
-    exists($$BREAKPAD_PRI) {
-        include($$BREAKPAD_PRI)
-        message("macOS: qBreakpad enabled")
-    } else {
-        message("macOS: qBreakpad not found → disabled")
-    }
+    DEFINES += NO_BREAKPAD
+    message("macOS: Breakpad explicitly disabled")
 }
+
 
 # -------------------------------------------------
 # Compiler flags
