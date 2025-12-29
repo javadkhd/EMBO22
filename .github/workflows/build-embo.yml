@@ -61,15 +61,17 @@ jobs:
     # =================================================
     # ================= WINDOWS =======================
     # =================================================
-    - name: Install Qt (Windows)
+    - name: Install MinGW (Windows)
+      if: matrix.os == 'windows-latest'
+      run: choco install mingw -y
+    
+    - name: Install Qt (Windows - MinGW)
       if: matrix.os == 'windows-latest'
       uses: jurplel/install-qt-action@v3
       with:
         version: '5.15.2'
-        arch: 'win64_msvc2019_64'
-        # پارامتر modules را حذف کرده‌ایم
+        arch: 'win64_mingw81'
         setup-python: false
-    
     # =================================================
     # ================= BUILD =========================
     # =================================================
@@ -89,16 +91,15 @@ jobs:
         fi
 
         make -j"$CORES"
-
+    
     - name: Build EMBO (Windows)
       if: matrix.os == 'windows-latest'
       shell: pwsh
       run: |
-        Set-StrictMode -Version Latest
         cd src/software/EMBO
-
-        qmake CONFIG+=release
+        qmake CONFIG+=release CI_BUILD=1
         nmake
+
 
     # =================================================
     # ============== PACKAGE BINARIES =================
