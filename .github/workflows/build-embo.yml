@@ -1,4 +1,4 @@
-name: Build EMBO (Release)
+name: Build EMBO (Qt5 Release)
 
 on:
   push:
@@ -8,13 +8,14 @@ on:
 
 jobs:
   build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 90
 
     steps:
     # ------------------------------------------------
@@ -23,6 +24,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
+        submodules: true
         lfs: true
 
     # =================================================
@@ -31,7 +33,6 @@ jobs:
     - name: Install dependencies (Linux)
       if: matrix.os == 'ubuntu-latest'
       run: |
-        set -e
         sudo apt-get update
         sudo apt-get install -y \
           build-essential \
@@ -50,104 +51,98 @@ jobs:
     - name: Install dependencies (macOS)
       if: matrix.os == 'macos-latest'
       run: |
-        set -e
         brew update
         brew install qt@5 fftw pkg-config zip
 
         echo "$(brew --prefix qt@5)/bin" >> $GITHUB_PATH
-        echo "CMAKE_PREFIX_PATH=$(brew --prefix qt@5)" >> $GITHUB_ENV
         echo "PKG_CONFIG_PATH=$(brew --prefix fftw)/lib/pkgconfig" >> $GITHUB_ENV
 
     # =================================================
     # ================= WINDOWS =======================
     # =================================================
-    
-    - name: Install Qt and Build Tools (Windows - MinGW)
+    - name: Install Qt (Windows - MinGW)
       if: matrix.os == 'windows-latest'
       shell: pwsh
       run: |
-        # نصب MinGW
         choco install -y mingw
-    
-        # نصب Qt 5.15.2 MinGW 64-bit
-        python -m pip install --upgrade pip
-        python -m pip install aqtinstall
-    
-        python -m aqt install-qt windows desktop 5.15.2 win64_mingw81 --outputdir D:/a/EMBO22/Qt --modules qtbase qttools qthelp serialport
-    
-        # اضافه کردن Qt به PATH
-        echo "D:/a/EMBO22/Qt/5.15.2/mingw81_64/bin" >> $env:GITHUB_PATH
-    
-        # ساخت stub برای qBreakpad (برای CI)
-        mkdir -p src/software/EMBO/lib/win64
-        cd src/software/EMBO/lib/win64
-        echo "void qBreakpad_stub(){}" > stub.c
-        gcc -c stub.c -o stub.o
-        ar rcs libqBreakpad.a stub.o
+        python -m pip install --upgrade pip aqtinstall
 
+        python -m aqt install-qt windows desktop 5.15.2 win64_mingw81 `
+          --outputdir $env:GITHUB_WORKSPACE/Qt `
+          --modules qttools qtserialport
 
-    
+        echo "$env:GITHUB_WORKSPACE/Qt/5.15.2/mingw81_64/bin" >> $env:GITHUB_PATH
+
     # =================================================
     # ================= BUILD =========================
     # =================================================
-    - name: Build EMBO (Linux / macOS)
-      if: matrix.os != 'windows-latest'
+    - name: Build (Linux)
+      if: matrix.os == 'ubuntu-latest'
       shell: bash
       run: |
-        set -euo pipefail
+        set -e
         cd src/software/EMBO
-
         qmake CONFIG+=release
+        make -j$(nproc)
 
-        if command -v nproc >/dev/null 2>&1; then
-          CORES=$(nproc)
-        else
-          CORES=2
-        fi
+    - name: Build (macOS)
+      if: matrix.os == 'macos-latest'
+      shell: bash
+      run: |
+        set -e
+        cd src/software/EMBO
+        qmake CONFIG+=release
+        make -j$(sysctl -n hw.ncpu)
 
-        make -j"$CORES"
-    
-    - name: Build EMBO (Windows - MinGW)
+    - name: Build (Windows)
       if: matrix.os == 'windows-latest'
       shell: bash
       run: |
         set -e
         cd src/software/EMBO
-    
         qmake CONFIG+=release
         mingw32-make -j2
 
-
     # =================================================
-    # ============== PACKAGE BINARIES =================
+    # ================= PACKAGE =======================
     # =================================================
-    - name: Package binaries (Linux / macOS)
-      if: matrix.os != 'windows-latest'
+    - name: Package (Linux)
+      if: matrix.os == 'ubuntu-latest'
       shell: bash
       run: |
         set -e
         cd src/software/EMBO
 
         mkdir -p package
-        cp build/*/EMBO package/ || true
+        cp build/linux/EMBO package/
         cp -r resources package/ || true
 
-        if [[ "$RUNNER_OS" == "macOS" ]]; then
-          macdeployqt package/EMBO.app -verbose=2 || true
-        fi
+        zip -r EMBO-linux.zip package
 
-        zip -r EMBO-${{ matrix.os }}.zip package
+    - name: Package (macOS)
+      if: matrix.os == 'macos-latest'
+      shell: bash
+      run: |
+        set -e
+        cd src/software/EMBO
 
-    - name: Package binaries (Windows)
+        mkdir -p package
+        cp -R build/macos/EMBO.app package/
+
+        macdeployqt package/EMBO.app -verbose=2
+
+        zip -r EMBO-macos.zip package
+
+    - name: Package (Windows)
       if: matrix.os == 'windows-latest'
       shell: pwsh
       run: |
-        Set-StrictMode -Version Latest
         cd src/software/EMBO
 
-        mkdir package
-        Copy-Item build\windows\*\EMBO.exe package\ -ErrorAction Stop
-        Copy-Item *.dll package\ -ErrorAction SilentlyContinue
+        New-Item -ItemType Directory -Force package | Out-Null
+        Copy-Item build\windows\*\EMBO.exe package\
+
+        windeployqt package\EMBO.exe
 
         Compress-Archive package EMBO-windows.zip
 
@@ -159,4 +154,4 @@ jobs:
       with:
         name: EMBO-${{ matrix.os }}
         path: |
-          src/software/EMBO/*.zip
+          src/software/EMBO/EMBO-*.zip
