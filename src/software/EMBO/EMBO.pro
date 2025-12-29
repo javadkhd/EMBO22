@@ -91,7 +91,17 @@ macx {
 
     LIBS += -framework AppKit
 
-    include(__crashhandler/qBreakpad.pri)
+    # ---------------------------------------------
+    # Optional Breakpad support (CI-safe)
+    # ---------------------------------------------
+    BREAKPAD_PRI = $$PWD/__crashhandler/qBreakpad.pri
+
+    exists($$BREAKPAD_PRI) {
+        include($$BREAKPAD_PRI)
+        message("macOS: qBreakpad enabled")
+    } else {
+        message("macOS: qBreakpad not found → disabled")
+    }
 }
 
 # -------------------------------------------------
