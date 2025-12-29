@@ -1,124 +1,105 @@
-# =================================================
-# =================== GENERAL =====================
-# =================================================
-
-QT += core gui network serialport
+QT += core gui network serialport help
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets printsupport
 
-TEMPLATE = app
-CONFIG += c++11 release
-DEFINES += QT_DEPRECATED_WARNINGS
+CONFIG += c++11
 
 VERSION = 0.1.5
-MIN_FW  = 0.2.3
+MIN_FW = 0.2.3
 
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 DEFINES += MIN_FW_VER=\\\"$$MIN_FW\\\"
+DEFINES += QT_DEPRECATED_WARNINGS
 
-TARGET = EMBO
-
-# -------------------------------------------------
-# Icons
-# -------------------------------------------------
 win32:RC_ICONS = icon.ico
 macx: ICON = icon.icns
 
-# -------------------------------------------------
-# Architecture detection
-# -------------------------------------------------
-greaterThan(QT_MAJOR_VERSION, 4) {
-    TARGET_ARCH = $$QT_ARCH
-} else {
-    TARGET_ARCH = $$QMAKE_HOST.arch
+greaterThan(QT_MAJOR_VERSION, 4){
+    TARGET_ARCH = $${QT_ARCH}
+}else{
+    TARGET_ARCH = $${QMAKE_HOST.arch}
 }
 
 # =================================================
-# ================= WINDOWS ========================
+# QSimpleUpdater (vendored – CI safe)
 # =================================================
+INCLUDEPATH += $$PWD/src/thirdparty/qsimpleupdater
+
+SOURCES += \
+    src/thirdparty/qsimpleupdater/QSimpleUpdater.cpp
+
+HEADERS += \
+    src/thirdparty/qsimpleupdater/QSimpleUpdater.h
+
+# =================================================
+# Platform specific
+# =================================================
+
+LINUX_LIB_DIR = ubuntu_18
+MACOS_LIB_DIR = mac_10.15
+
 win32 {
 
-    ARCHITECTURE = windows
-    DESTDIR = $$PWD/build/windows
+    ARCHITECTURE = win64
+    QMAKE_LIBDIR += $$PWD/lib/win64
+    LIBS += $$PWD/lib/win64/libfftw3-3.dll
 
-    # FFTW (DLL runtime)
-    contains(TARGET_ARCH, x86_64) {
-        INSTALL_DLL = $$PWD/lib/win64/libfftw3-3.dll
-    } else {
-        INSTALL_DLL = $$PWD/lib/win32/libfftw3-3.dll
-    }
+    CONFIG(release, debug|release): DESTDIR = $$PWD/build/windows/release
+    CONFIG(debug, debug|release): DESTDIR = $$PWD/build/windows/debug
 
-    inst.files = $$INSTALL_DLL
-    inst.path  = $$DESTDIR
-    INSTALLS  += inst
+    inst.files += $$PWD/lib/win64/libfftw3-3.dll
+    inst.path += $${DESTDIR}
+    INSTALLS += inst
 
-    help.files = $$PWD/doc/EMBO.chm $$PWD/doc/EMBO.pdf
-    help.path  = $$DESTDIR/doc
-    INSTALLS  += help
+    help.files += "$${PWD}/doc/EMBO.chm" \
+                  "$${PWD}/doc/EMBO.pdf"
+    help.path += $${DESTDIR}/doc
+    INSTALLS += help
 }
 
-# =================================================
-# ================= LINUX =========================
-# =================================================
-unix:!macx {
+linux {
 
     ARCHITECTURE = linux
-    DESTDIR = $$PWD/build/linux
+    QMAKE_LIBDIR += $$PWD/lib/$$LINUX_LIB_DIR
+    LIBS += $$PWD/lib/$$LINUX_LIB_DIR/libfftw3.a
 
-    CONFIG += link_pkgconfig
-    PKGCONFIG += fftw3
-
-    QMAKE_CXXFLAGS += -fPIC
+    CONFIG(release, debug|release): DESTDIR = $$PWD/build/linux/release
+    CONFIG(debug, debug|release): DESTDIR = $$PWD/build/linux/debug
 }
 
-# =================================================
-# ================= macOS =========================
-# =================================================
 macx {
 
-    ARCHITECTURE = macos
-    DESTDIR = $$PWD/build/macos
-
-    CONFIG += app_bundle
-    QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.15
-
-    CONFIG += link_pkgconfig
-    PKGCONFIG += fftw3
-
+    ARCHITECTURE = mac
+    QMAKE_LIBDIR += $$PWD/lib/$$MACOS_LIB_DIR
     LIBS += -framework AppKit
+    LIBS += $$PWD/lib/$$MACOS_LIB_DIR/libfftw3.a
 
-    message("macOS: Building EMBO.app bundle")
+    CONFIG(release, debug|release): DESTDIR = $$PWD/build/mac/release
+    CONFIG(debug, debug|release): DESTDIR = $$PWD/build/mac/debug
 }
 
-# -------------------------------------------------
-# Compiler flags
-# -------------------------------------------------
+# =================================================
+# Project metadata
+# =================================================
+
+QMAKE_TARGET_COMPANY = CTU Jakub Parez
+QMAKE_TARGET_PRODUCT = EMBO
+QMAKE_TARGET_DESCRIPTION = EMBedded Oscilloscope
+QMAKE_TARGET_COPYRIGHT = CTU Jakub Parez
+
 QMAKE_CXXFLAGS += -Wno-deprecated -Wno-deprecated-declarations
+QMAKE_POST_LINK = $(MAKE) install
 
-# -------------------------------------------------
-# Metadata
-# -------------------------------------------------
-QMAKE_TARGET_COMPANY     = "CTU Javad Khadem"
-QMAKE_TARGET_PRODUCT     = "EMBO"
-QMAKE_TARGET_DESCRIPTION = "EMBedded Oscilloscope"
-QMAKE_TARGET_COPYRIGHT   = "© CTU Javad Khadem"
+# =================================================
+# Includes
+# =================================================
 
-# -------------------------------------------------
-# Install target (Linux only)
-# -------------------------------------------------
-unix:!android:!macx {
-    target.path = /opt/$$TARGET/bin
-    INSTALLS += target
-}
-
-# -------------------------------------------------
-# Include paths
-# -------------------------------------------------
 INCLUDEPATH += src
 INCLUDEPATH += src/windows
 
-# -------------------------------------------------
-# Sources
-# -------------------------------------------------
+# =================================================
+# Sources / Headers / Forms
+# =================================================
+
 SOURCES += \
     lib/qdial2.cpp \
     lib/ctkrangeslider.cpp \
@@ -139,16 +120,13 @@ SOURCES += \
     src/windows/window_sgen.cpp \
     src/windows/window_vm.cpp
 
-# -------------------------------------------------
-# Headers
-# -------------------------------------------------
 HEADERS += \
     lib/qdial2.h \
     lib/ctkrangeslider.h \
     lib/qcustomplot.h \
     lib/fftw3.h \
-    src/core.h \
     src/containers.h \
+    src/core.h \
     src/css.h \
     src/interfaces.h \
     src/messages.h \
@@ -166,9 +144,6 @@ HEADERS += \
     src/windows/window_sgen.h \
     src/windows/window_vm.h
 
-# -------------------------------------------------
-# UI Forms
-# -------------------------------------------------
 FORMS += \
     src/windows/window__main.ui \
     src/windows/window_cntr.ui \
@@ -178,14 +153,8 @@ FORMS += \
     src/windows/window_sgen.ui \
     src/windows/window_vm.ui
 
-# -------------------------------------------------
-# Resources
-# -------------------------------------------------
 RESOURCES += resources/resources.qrc
 
-# -------------------------------------------------
-# Distribution files
-# -------------------------------------------------
 DISTFILES += \
     icon.icns \
     icon.ico
