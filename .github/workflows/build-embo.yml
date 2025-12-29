@@ -58,39 +58,29 @@ jobs:
         echo "CMAKE_PREFIX_PATH=$(brew --prefix qt@5)" >> $GITHUB_ENV
         echo "PKG_CONFIG_PATH=$(brew --prefix fftw)/lib/pkgconfig" >> $GITHUB_ENV
 
-        
     # =================================================
     # ================= WINDOWS =======================
     # =================================================
-    - name: Install dependencies (Windows)
+    - name: Install Qt (Windows)
       if: matrix.os == 'windows-latest'
       uses: jurplel/install-qt-action@v3
       with:
         version: '5.15.2'
         arch: 'win64_msvc2022_64'
-        modules: |
-          qtbase \
-          qttools \
-          serialport \
-          qthelp
-
+        modules: qtbase, qttools, serialport, qthelp
 
     # =================================================
     # ================= BUILD =========================
     # =================================================
-    - name: Build EMBO
+    - name: Build EMBO (Linux / macOS)
+      if: matrix.os != 'windows-latest'
       shell: bash
       run: |
         set -euo pipefail
         cd src/software/EMBO
 
-        echo "=== qmake version ==="
-        qmake --version
-
-        echo "=== Running qmake ==="
         qmake CONFIG+=release
 
-        echo "=== Building ==="
         if command -v nproc >/dev/null 2>&1; then
           CORES=$(nproc)
         else
@@ -98,6 +88,16 @@ jobs:
         fi
 
         make -j"$CORES"
+
+    - name: Build EMBO (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
+      run: |
+        Set-StrictMode -Version Latest
+        cd src/software/EMBO
+
+        qmake CONFIG+=release
+        nmake
 
     # =================================================
     # ============== PACKAGE BINARIES =================
@@ -124,11 +124,10 @@ jobs:
       shell: pwsh
       run: |
         Set-StrictMode -Version Latest
-
         cd src/software/EMBO
-        mkdir package
 
-        Copy-Item build\windows\*\EMBO.exe package\
+        mkdir package
+        Copy-Item build\windows\*\EMBO.exe package\ -ErrorAction Stop
         Copy-Item *.dll package\ -ErrorAction SilentlyContinue
 
         Compress-Archive package EMBO-windows.zip
