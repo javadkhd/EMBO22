@@ -58,6 +58,7 @@ jobs:
         echo "CMAKE_PREFIX_PATH=$(brew --prefix qt@5)" >> $GITHUB_ENV
         echo "PKG_CONFIG_PATH=$(brew --prefix fftw)/lib/pkgconfig" >> $GITHUB_ENV
 
+        
     # =================================================
     # ================= WINDOWS =======================
     # =================================================
@@ -66,7 +67,30 @@ jobs:
       uses: jurplel/install-qt-action@v3
       with:
         version: '5.15.2'
-        arch: 'win64_msvc2019_64'
+        arch: 'win64_msvc2022_64'   # use newer MSVC
+        modules: 'qtbase,qttools,serialport,qthelp'
+    
+    - name: Setup MSVC environment
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
+      run: |
+        # Load Visual Studio environment
+        & "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat"
+        cd src/software/EMBO
+    
+    - name: Build EMBO (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
+      run: |
+        cd src/software/EMBO
+        echo "=== qmake version ==="
+        qmake --version
+    
+        echo "=== Running qmake ==="
+        qmake CONFIG+=release
+    
+        echo "=== Building with nmake ==="
+        nmake /f Makefile.Release
 
 
     # =================================================
