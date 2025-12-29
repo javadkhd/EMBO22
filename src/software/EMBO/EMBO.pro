@@ -1,16 +1,25 @@
+# =================================================
+# =================== GENERAL =====================
+# =================================================
+
 QT += core gui network serialport
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets printsupport
 
-CONFIG += c++11 release
 TEMPLATE = app
+CONFIG += c++11 release
+DEFINES += QT_DEPRECATED_WARNINGS
 
 VERSION = 0.1.5
 MIN_FW  = 0.2.3
 
 DEFINES += APP_VERSION=\\\"$$VERSION\\\"
 DEFINES += MIN_FW_VER=\\\"$$MIN_FW\\\"
-DEFINES += QT_DEPRECATED_WARNINGS
 
+TARGET = EMBO
+
+# -------------------------------------------------
+# Icons
+# -------------------------------------------------
 win32:RC_ICONS = icon.ico
 macx: ICON = icon.icns
 
@@ -23,46 +32,29 @@ greaterThan(QT_MAJOR_VERSION, 4) {
     TARGET_ARCH = $$QMAKE_HOST.arch
 }
 
-# -------------------------------------------------
-# Updater
-# -------------------------------------------------
-include(__updater/QSimpleUpdater.pri)
-
 # =================================================
-# ================ WINDOWS ========================
+# ================= WINDOWS ========================
 # =================================================
 win32 {
 
-    QT += help
-    include(__crashhandler/qBreakpad.pri)
+    ARCHITECTURE = windows
+    DESTDIR = $$PWD/build/windows
 
+    # FFTW (DLL runtime)
     contains(TARGET_ARCH, x86_64) {
-        ARCHITECTURE = win64
-        DESTDIR = $$PWD/build/windows/x64
-        QMAKE_LIBDIR += $$PWD/lib/win64
-        LIBS += $$PWD/lib/win64/libqBreakpad.a
         INSTALL_DLL = $$PWD/lib/win64/libfftw3-3.dll
     } else {
-        ARCHITECTURE = win32
-        DESTDIR = $$PWD/build/windows/x86
-        QMAKE_LIBDIR += $$PWD/lib/win32
-        LIBS += $$PWD/lib/win32/libqBreakpad.a
         INSTALL_DLL = $$PWD/lib/win32/libfftw3-3.dll
     }
 
-    # فقط مسیر DLL برای run-time اضافه شود، نه نام کتابخانه
-    # چون MSVC با -lfftw3-3 کار نمی‌کند
-    # LIBS += -lfftw3-3
-
     inst.files = $$INSTALL_DLL
-    inst.path = $$DESTDIR
-    INSTALLS += inst
+    inst.path  = $$DESTDIR
+    INSTALLS  += inst
 
-    help.files += $$PWD/doc/EMBO.chm $$PWD/doc/EMBO.pdf
-    help.path = $$DESTDIR/doc
-    INSTALLS += help
+    help.files = $$PWD/doc/EMBO.chm $$PWD/doc/EMBO.pdf
+    help.path  = $$DESTDIR/doc
+    INSTALLS  += help
 }
-
 
 # =================================================
 # ================= LINUX =========================
@@ -76,32 +68,26 @@ unix:!macx {
     PKGCONFIG += fftw3
 
     QMAKE_CXXFLAGS += -fPIC
-
-    # Optional breakpad
-    # include(__crashhandler/qBreakpad.pri)
 }
 
 # =================================================
 # ================= macOS =========================
 # =================================================
-
 macx {
 
     ARCHITECTURE = macos
     DESTDIR = $$PWD/build/macos
+
+    CONFIG += app_bundle
+    QMAKE_MACOSX_DEPLOYMENT_TARGET = 10.15
 
     CONFIG += link_pkgconfig
     PKGCONFIG += fftw3
 
     LIBS += -framework AppKit
 
-    # ---------------------------------------------
-    # !!! Breakpad DISABLED on macOS !!!
-    # ---------------------------------------------
-    DEFINES += NO_BREAKPAD
-    message("macOS: Breakpad explicitly disabled")
+    message("macOS: Building EMBO.app bundle")
 }
-
 
 # -------------------------------------------------
 # Compiler flags
@@ -111,15 +97,15 @@ QMAKE_CXXFLAGS += -Wno-deprecated -Wno-deprecated-declarations
 # -------------------------------------------------
 # Metadata
 # -------------------------------------------------
-QMAKE_TARGET_COMPANY = "CTU Javad Khadem"
-QMAKE_TARGET_PRODUCT = "EMBO"
+QMAKE_TARGET_COMPANY     = "CTU Javad Khadem"
+QMAKE_TARGET_PRODUCT     = "EMBO"
 QMAKE_TARGET_DESCRIPTION = "EMBedded Oscilloscope"
-QMAKE_TARGET_COPYRIGHT = "© CTU Javad Khadem"
+QMAKE_TARGET_COPYRIGHT   = "© CTU Javad Khadem"
 
 # -------------------------------------------------
-# Install target
+# Install target (Linux only)
 # -------------------------------------------------
-unix:!android {
+unix:!android:!macx {
     target.path = /opt/$$TARGET/bin
     INSTALLS += target
 }
