@@ -1,4 +1,4 @@
-name: Build EMBO (Qt5)
+name: Build EMBO (Release)
 
 on:
   push:
@@ -10,69 +10,269 @@ jobs:
   build:
     strategy:
       fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+      matrix: 
+        include:
+          - os: ubuntu-latest
+            build-type: linux
+          - os: macos-latest
+            build-type: macos
+          - os:  windows-latest
+            build-type: windows
 
-    runs-on: ${{ matrix.os }}
+    runs-on:  ${{ matrix.os }}
+    timeout-minutes: 90
 
     steps:
-    - uses: actions/checkout@v4
+    # ================================================
+    # CHECKOUT
+    # ================================================
+    - name: Checkout repository
+      uses: actions/checkout@v4
       with:
-        lfs: false
+        lfs: true
 
-    # ===================== Linux =====================
-    - if: runner.os == 'Linux'
+    # ================================================
+    # LINUX DEPENDENCIES
+    # ================================================
+    - name: Install dependencies (Linux)
+      if: matrix.build-type == 'linux'
       run: |
-        sudo apt update
-        sudo apt install -y \
+        set -e
+        sudo apt-get update
+        sudo apt-get install -y \
           build-essential \
           qtbase5-dev \
           qt5-qmake \
+          qttools5-dev-tools \
           libqt5serialport5-dev \
+          libgl1-mesa-dev \
           libfftw3-dev \
           pkg-config \
           zip
 
-    # ===================== macOS =====================
-    - if: runner.os == 'macOS'
+    # ================================================
+    # MACOS DEPENDENCIES
+    # ================================================
+    - name: Install dependencies (macOS)
+      if: matrix.build-type == 'macos'
       run: |
+        set -e
         brew update
         brew install qt@5 fftw pkg-config zip
+
         echo "$(brew --prefix qt@5)/bin" >> $GITHUB_PATH
+        echo "CMAKE_PREFIX_PATH=$(brew --prefix qt@5)" >> $GITHUB_ENV
         echo "PKG_CONFIG_PATH=$(brew --prefix fftw)/lib/pkgconfig" >> $GITHUB_ENV
 
-    # ===================== Windows =====================
-    - if: runner.os == 'Windows'
+    # ================================================
+    # WINDOWS DEPENDENCIES (Qt + MinGW)
+    # ================================================
+    - name: Install Qt and MinGW (Windows)
+      if: matrix.build-type == 'windows'
       shell: pwsh
       run: |
-        choco install -y mingw
+        # نصب ابزارهای ضروری
+        choco install -y zip
+        
+        # نصب Python و aqt
         python -m pip install --upgrade pip
         python -m pip install aqtinstall
-        python -m aqt install-qt windows desktop 5.15.2 win64_mingw81 --modules qtserialport
-        echo "${{ github.workspace }}\Qt\5.15.2\mingw81_64\bin" >> $env:GITHUB_PATH
 
-    # ===================== Build =====================
-    - name: Build
+    - name: Download Qt 5.15.2 (Windows)
+      if: matrix.build-type == 'windows'
+      shell: pwsh
+      run: |
+        # دانلود Qt 5.15.2 با MinGW
+        python -m aqt install-qt `
+          windows desktop 5.15.2 win64_mingw81 `
+          --outputdir D:/Qt `
+          --modules qtbase qttools qtserialport
+
+        # اضافه کردن مسیرها
+        echo "D:/Qt/5.15.2/mingw81_64/bin" >> $env:GITHUB_PATH
+        echo "D:/Qt/Tools/mingw810_64/bin" >> $env:GITHUB_PATH
+
+    - name: Create qBreakpad stub library (Windows)
+      if: matrix.build-type == 'windows'
+      shell: pwsh
+      run: |
+        $stubDir = "src/software/EMBO/lib/win64"
+        if (-not (Test-Path $stubDir)) {
+          New-Item -ItemType Directory -Path $stubDir -Force
+        }
+        
+        $stubCode = @"
+        void qBreakpad_stub() {}
+        "@
+        $stubCode | Out-File -FilePath "$stubDir/stub.c" -Encoding ASCII
+        
+        # جمع‌آوری stub
+        cd $stubDir
+        gcc -c stub.c -o stub.o
+        ar rcs libqBreakpad. a stub.o
+        cd ../../../.. 
+
+    # ================================================
+    # BUILD (Linux)
+    # ================================================
+    - name: Build (Linux)
+      if: matrix.build-type == 'linux'
       shell: bash
       run: |
+        set -euo pipefail
         cd src/software/EMBO
+
         qmake CONFIG+=release
-    
-        if [[ "$RUNNER_OS" == "Windows" ]]; then
-          mingw32-make -j2
-        else
-          make -j2
+        make -j$(nproc)
+        make install
+
+    # ================================================
+    # BUILD (macOS)
+    # ================================================
+    - name: Build (macOS)
+      if: matrix.build-type == 'macos'
+      shell: bash
+      run: |
+        set -euo pipefail
+        cd src/software/EMBO
+
+        qmake CONFIG+=release
+        make -j$(sysctl -n hw.ncpu)
+        make install
+
+    # ================================================
+    # BUILD (Windows)
+    # ================================================
+    - name: Build (Windows)
+      if: matrix.build-type == 'windows'
+      shell: bash
+      run:  |
+        set -e
+        cd src/software/EMBO
+
+        qmake CONFIG+=release
+        mingw32-make -j2
+
+    # ================================================
+    # PACKAGE (Linux)
+    # ================================================
+    - name: Package binaries (Linux)
+      if: matrix.build-type == 'linux'
+      shell: bash
+      run: |
+        set -e
+        cd src/software/EMBO
+
+        BINARY=$(find build -name "EMBO" -type f 2>/dev/null | head -1)
+        
+        if [ -z "$BINARY" ]; then
+          echo "Error:  EMBO binary not found!"
+          ls -la build/
+          exit 1
         fi
 
-    # ===================== Package =====================
-    - shell: bash
-      run: |
-        cd src/software/EMBO
-        mkdir -p package
-        cp build/*/* package/ || true
-        zip -r EMBO-${{ runner.os }}.zip package
+        mkdir -p EMBO-linux/lib
+        cp "$BINARY" EMBO-linux/
+        ldd "$BINARY" | grep -o '/[^ ]*' | while read lib; do
+          if [ -f "$lib" ]; then
+            cp "$lib" EMBO-linux/lib/ 2>/dev/null || true
+          fi
+        done
 
-    - uses: actions/upload-artifact@v4
+        zip -r EMBO-linux. zip EMBO-linux/
+
+    # ================================================
+    # PACKAGE (macOS)
+    # ================================================
+    - name: Package binaries (macOS)
+      if: matrix.build-type == 'macos'
+      shell: bash
+      run: |
+        set -e
+        cd src/software/EMBO
+
+        BINARY=$(find build -name "EMBO. app" -type d 2>/dev/null | head -1)
+        
+        if [ -z "$BINARY" ]; then
+          echo "Error: EMBO.app not found!"
+          ls -la build/
+          exit 1
+        fi
+
+        # استفاده از macdeployqt برای بسته‌بندی
+        QT_PATH=$(brew --prefix qt@5)
+        export PATH="$QT_PATH/bin:$PATH"
+        
+        mkdir -p EMBO-macos
+        cp -r "$BINARY" EMBO-macos/
+        
+        macdeployqt "EMBO-macos/EMBO.app" -dmg -verbose=2
+
+        # انتقال DMG اگر ایجاد شد
+        if [ -f "EMBO-macos/EMBO.dmg" ]; then
+          mv EMBO-macos/EMBO.dmg EMBO-macos. dmg
+          rm -rf EMBO-macos
+        else
+          zip -r EMBO-macos.zip EMBO-macos/
+        fi
+
+    # ================================================
+    # PACKAGE (Windows)
+    # ================================================
+    - name: Package binaries (Windows)
+      if: matrix.build-type == 'windows'
+      shell: pwsh
+      run: |
+        Set-StrictMode -Version Latest
+        cd src/software/EMBO
+
+        # جستجو برای فایل اجرایی
+        $binaries = @(Get-ChildItem -Path build -Filter "EMBO. exe" -Recurse)
+        
+        if ($binaries.Count -eq 0) {
+          Write-Error "EMBO.exe not found!"
+          Get-ChildItem -Path build -Recurse
+          exit 1
+        }
+
+        $EMBO_EXE = $binaries[0].FullName
+        
+        # ایجاد پوشه بسته‌بندی
+        New-Item -ItemType Directory -Path "EMBO-windows" -Force | Out-Null
+        
+        # کپی فایل اجرایی
+        Copy-Item $EMBO_EXE "EMBO-windows\" -Force
+
+        # کپی DLL‌های Qt و وابستگی‌ها
+        $QT_BIN = "D:/Qt/5.15.2/mingw81_64/bin"
+        if (Test-Path $QT_BIN) {
+          Copy-Item "$QT_BIN/Qt5Core.dll" "EMBO-windows\" -ErrorAction SilentlyContinue
+          Copy-Item "$QT_BIN/Qt5Gui.dll" "EMBO-windows\" -ErrorAction SilentlyContinue
+          Copy-Item "$QT_BIN/Qt5Widgets. dll" "EMBO-windows\" -ErrorAction SilentlyContinue
+          Copy-Item "$QT_BIN/Qt5Network.dll" "EMBO-windows\" -ErrorAction SilentlyContinue
+          Copy-Item "$QT_BIN/Qt5SerialPort.dll" "EMBO-windows\" -ErrorAction SilentlyContinue
+          Copy-Item "$QT_BIN/libwinpthread-1.dll" "EMBO-windows\" -ErrorAction SilentlyContinue
+          Copy-Item "$QT_BIN/libgcc_s_seh-1.dll" "EMBO-windows\" -ErrorAction SilentlyContinue
+          Copy-Item "$QT_BIN/libstdc++-6.dll" "EMBO-windows\" -ErrorAction SilentlyContinue
+        }
+
+        # کپی FFTW
+        Copy-Item "lib/win64/libfftw3-3.dll" "EMBO-windows\" -ErrorAction SilentlyContinue
+
+        # کپی resources
+        Copy-Item "resources" "EMBO-windows/resources" -Recurse -ErrorAction SilentlyContinue
+
+        # فشرده‌سازی
+        Compress-Archive -Path "EMBO-windows" -DestinationPath "EMBO-windows. zip" -Force
+
+    # ================================================
+    # UPLOAD ARTIFACTS
+    # ================================================
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
       with:
-        name: EMBO-${{ runner.os }}
-        path: src/software/EMBO/EMBO-*.zip
+        name: EMBO-${{ matrix.build-type }}
+        path: |
+          src/software/EMBO/EMBO-*. zip
+          src/software/EMBO/EMBO-*. dmg
+        retention-days: 30
