@@ -12,7 +12,7 @@ DEFINES += MIN_FW_VER=\\\"$$MIN_FW\\\"
 DEFINES += QT_DEPRECATED_WARNINGS
 
 win32:RC_ICONS = icon.ico
-macx:ICON = icon.icns
+macx: ICON = icon.icns
 
 # -------------------------------------------------
 # Optional QtHelp
@@ -23,14 +23,14 @@ qtHaveModule(help) {
 }
 
 # -------------------------------------------------
-# Disable updater by default (CI-safe)
+# QSimpleUpdater
 # -------------------------------------------------
-! contains(CONFIG, enable_updater) {
-    DEFINES += NO_UPDATER
+exists($$PWD/__updater/QSimpleUpdater.pri) {
+    include($$PWD/__updater/QSimpleUpdater.pri)
+    message("QSimpleUpdater included successfully")
 } else {
-    exists(__updater/QSimpleUpdater.pri) {
-        include(__updater/QSimpleUpdater.pri)
-    }
+    DEFINES += NO_UPDATER
+    message("QSimpleUpdater NOT found - building without updater support")
 }
 
 # -------------------------------------------------
@@ -63,7 +63,7 @@ win32 {
 # =================================================
 # LINUX BUILD
 # =================================================
-unix: ! macx {
+unix: !macx {
     TARGET = EMBO
     ARCHITECTURE = linux
     DESTDIR = $$PWD/build/linux/release
@@ -108,9 +108,9 @@ SOURCES += \
     lib/ctkrangeslider.cpp \
     lib/qcustomplot.cpp \
     src/main.cpp \
-    src/core.cpp \
+    src/core. cpp \
     src/messages.cpp \
-    src/msg.cpp \
+    src/msg. cpp \
     src/qcpcursors.cpp \
     src/recorder.cpp \
     src/settings.cpp \
@@ -125,7 +125,7 @@ SOURCES += \
 
 HEADERS += \
     lib/qdial2.h \
-    lib/ctkrangeslider.h \
+    lib/ctkrangeslider. h \
     lib/qcustomplot.h \
     lib/fftw3.h \
     src/core.h \
@@ -144,7 +144,7 @@ HEADERS += \
     src/windows/window_la.h \
     src/windows/window_pwm.h \
     src/windows/window_scope.h \
-    src/windows/window_sgen.h \
+    src/windows/window_sgen. h \
     src/windows/window_vm.h
 
 FORMS += \
@@ -152,7 +152,7 @@ FORMS += \
     src/windows/window_cntr.ui \
     src/windows/window_la.ui \
     src/windows/window_pwm.ui \
-    src/windows/window_scope.ui \
+    src/windows/window_scope. ui \
     src/windows/window_sgen.ui \
     src/windows/window_vm.ui
 
