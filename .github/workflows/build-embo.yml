@@ -1,233 +1,157 @@
-name: Build EMBO
+name: Build EMBO (Qt5 Release)
 
 on:
   push:
-    branches: [ master, main, develop ]
+    branches: [ master ]
   pull_request:
-    branches: [ master, main, develop ]
+  workflow_dispatch:
 
 jobs:
   build:
     name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+
     strategy:
+      fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-latest
-            artifact_name: embo
-            asset_name: embo-linux-x64
-          - os: macos-latest
-            artifact_name: embo
-            asset_name: embo-macos-x64
-          - os: windows-latest
-            artifact_name: embo.exe
-            asset_name: embo-windows-x64.exe
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
-    - name: Checkout code
+    # ------------------------------------------------
+    # Checkout
+    # ------------------------------------------------
+    - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        submodules: true
+        lfs: true
 
-    - name: Set up build environment (Ubuntu)
-      if: runner.os == 'Linux'
+    # =================================================
+    # ================= LINUX =========================
+    # =================================================
+    - name: Install dependencies (Linux)
+      if: matrix.os == 'ubuntu-latest'
       run: |
         sudo apt-get update
-        sudo apt-get install -y build-essential cmake
+        sudo apt-get install -y \
+          build-essential \
+          qtbase5-dev \
+          qt5-qmake \
+          qttools5-dev-tools \
+          libqt5serialport5-dev \
+          libgl1-mesa-dev \
+          libfftw3-dev \
+          pkg-config \
+          zip
 
-    - name: Set up build environment (macOS)
-      if: runner.os == 'macOS'
+    # =================================================
+    # ================= macOS =========================
+    # =================================================
+    - name: Install dependencies (macOS)
+      if: matrix.os == 'macos-latest'
       run: |
-        brew install cmake
+        brew update
+        brew install qt@5 fftw pkg-config zip
 
-    - name: Set up build environment (Windows)
-      if: runner.os == 'Windows'
+        echo "$(brew --prefix qt@5)/bin" >> $GITHUB_PATH
+        echo "PKG_CONFIG_PATH=$(brew --prefix fftw)/lib/pkgconfig" >> $GITHUB_ENV
+
+    # =================================================
+    # ================= WINDOWS =======================
+    # =================================================
+    - name: Install Qt (Windows - MinGW)
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
       run: |
-        choco install cmake --yes
+        choco install -y mingw
+        python -m pip install --upgrade pip aqtinstall
 
-    - name: Debug - List directory structure
+        python -m aqt install-qt windows desktop 5.15.2 win64_mingw81 `
+          --outputdir $env:GITHUB_WORKSPACE/Qt `
+          --modules qttools qtserialport
+
+        echo "$env:GITHUB_WORKSPACE/Qt/5.15.2/mingw81_64/bin" >> $env:GITHUB_PATH
+
+    # =================================================
+    # ================= BUILD =========================
+    # =================================================
+    - name: Build (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      shell: bash
       run: |
-        echo "Current directory: $(pwd)"
-        echo "Directory contents:"
-        ls -la
-        echo "Subdirectories:"
-        find . -maxdepth 2 -type d | head -20
+        set -e
+        cd src/software/EMBO
+        qmake CONFIG+=release
+        make -j$(nproc)
 
-    - name: Create build directory
+    - name: Build (macOS)
+      if: matrix.os == 'macos-latest'
+      shell: bash
       run: |
-        mkdir -p build
-        cd build
-        cmake ..
+        set -e
+        cd src/software/EMBO
+        qmake CONFIG+=release
+        make -j$(sysctl -n hw.ncpu)
 
-    - name: Build project
+    - name: Build (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: bash
       run: |
-        cd build
-        cmake --build . --config Release
+        set -e
+        cd src/software/EMBO
+        qmake CONFIG+=release
+        mingw32-make -j2
 
-    - name: Debug - Find binaries (Unix)
-      if: runner.os != 'Windows'
+    # =================================================
+    # ================= PACKAGE =======================
+    # =================================================
+    - name: Package (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      shell: bash
       run: |
-        echo "Searching for build artifacts..."
-        find . -type f -name "embo" -o -name "*.so" -o -name "*.a" | head -20
-        echo "Build directory contents:"
-        ls -la build/ || true
-        echo "Contents of build subdirectories:"
-        find build -type f | head -30
+        set -e
+        cd src/software/EMBO
 
-    - name: Debug - Find binaries (Windows)
-      if: runner.os == 'Windows'
-      shell: powershell
+        mkdir -p package
+        cp build/linux/EMBO package/
+        cp -r resources package/ || true
+
+        zip -r EMBO-linux.zip package
+
+    - name: Package (macOS)
+      if: matrix.os == 'macos-latest'
+      shell: bash
       run: |
-        Write-Host "Searching for build artifacts..."
-        Get-ChildItem -Recurse -Filter "*.exe" | Select-Object FullName | Format-Table -AutoSize
-        Write-Host "Build directory contents:"
-        Get-ChildItem -Path "build" -Recurse | Format-Table FullName
-        Write-Host "Contents of Release folder:"
-        Get-ChildItem -Path "build\Release" -Recurse -ErrorAction SilentlyContinue | Format-Table FullName
+        set -e
+        cd src/software/EMBO
 
-    - name: Locate binary (Unix)
-      if: runner.os != 'Windows'
-      id: locate_binary
+        mkdir -p package
+        cp -R build/macos/EMBO.app package/
+
+        macdeployqt package/EMBO.app -verbose=2
+
+        zip -r EMBO-macos.zip package
+
+    - name: Package (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: pwsh
       run: |
-        # Search for the binary in common locations
-        BINARY_PATH=""
-        
-        # Check common build output locations
-        for path in build/embo build/Release/embo build/src/embo ./embo; do
-          if [ -f "$path" ]; then
-            BINARY_PATH="$path"
-            break
-          fi
-        done
-        
-        if [ -z "$BINARY_PATH" ]; then
-          echo "ERROR: Binary not found in expected locations"
-          echo "Searching entire build directory..."
-          BINARY_PATH=$(find build -name "embo" -type f | head -1)
-        fi
-        
-        if [ -f "$BINARY_PATH" ]; then
-          echo "Binary found at: $BINARY_PATH"
-          echo "binary_path=$BINARY_PATH" >> $GITHUB_OUTPUT
-          chmod +x "$BINARY_PATH"
-        else
-          echo "ERROR: Could not locate embo binary"
-          exit 1
-        fi
+        cd src/software/EMBO
 
-    - name: Locate binary (Windows)
-      if: runner.os == 'Windows'
-      id: locate_binary_win
-      shell: powershell
-      run: |
-        # Search for the binary in common locations
-        $binaryPath = ""
-        
-        $searchPaths = @(
-          "build\embo.exe",
-          "build\Release\embo.exe",
-          "build\src\embo.exe",
-          ".\embo.exe"
-        )
-        
-        foreach ($path in $searchPaths) {
-          if (Test-Path $path) {
-            $binaryPath = $path
-            break
-          }
-        }
-        
-        if ([string]::IsNullOrEmpty($binaryPath)) {
-          Write-Host "Binary not found in expected locations, searching recursively..."
-          $binaryPath = Get-ChildItem -Recurse -Name "embo.exe" -Path "build" | Select-Object -First 1
-          if ($null -ne $binaryPath) {
-            $binaryPath = "build\$binaryPath"
-          }
-        }
-        
-        if (Test-Path $binaryPath) {
-          Write-Host "Binary found at: $binaryPath"
-          echo "binary_path=$binaryPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-        } else {
-          Write-Host "ERROR: Could not locate embo.exe binary"
-          exit 1
-        }
+        New-Item -ItemType Directory -Force package | Out-Null
+        Copy-Item build\windows\*\EMBO.exe package\
 
-    - name: Verify binary (Unix)
-      if: runner.os != 'Windows'
-      run: |
-        BINARY_PATH="${{ steps.locate_binary.outputs.binary_path }}"
-        if [ -f "$BINARY_PATH" ]; then
-          echo "Binary exists: $BINARY_PATH"
-          echo "Binary size: $(stat -f%z "$BINARY_PATH" 2>/dev/null || stat -c%s "$BINARY_PATH")"
-          echo "Binary is executable: $([ -x "$BINARY_PATH" ] && echo 'Yes' || echo 'No')"
-          echo "Attempting to run binary with --version or --help:"
-          "$BINARY_PATH" --version 2>/dev/null || "$BINARY_PATH" --help 2>/dev/null || echo "Binary executed (no version flag available)"
-        else
-          echo "ERROR: Binary not found at $BINARY_PATH"
-          exit 1
-        fi
+        windeployqt package\EMBO.exe
 
-    - name: Verify binary (Windows)
-      if: runner.os == 'Windows'
-      shell: powershell
-      run: |
-        $binaryPath = "${{ steps.locate_binary_win.outputs.binary_path }}"
-        if (Test-Path $binaryPath) {
-          Write-Host "Binary exists: $binaryPath"
-          $size = (Get-Item $binaryPath).Length
-          Write-Host "Binary size: $size bytes"
-          Write-Host "Attempting to run binary with --version or --help:"
-          & $binaryPath --version 2>$null || & $binaryPath --help 2>$null || Write-Host "Binary executed (no version flag available)"
-        } else {
-          Write-Host "ERROR: Binary not found at $binaryPath"
-          exit 1
-        }
+        Compress-Archive package EMBO-windows.zip
 
-    - name: Create assets directory
-      run: |
-        mkdir -p assets
-
-    - name: Package binary (Unix)
-      if: runner.os != 'Windows'
-      run: |
-        BINARY_PATH="${{ steps.locate_binary.outputs.binary_path }}"
-        ASSET_NAME="${{ matrix.asset_name }}"
-        cp "$BINARY_PATH" "assets/$ASSET_NAME"
-        chmod +x "assets/$ASSET_NAME"
-        echo "Assets created:"
-        ls -lh assets/
-
-    - name: Package binary (Windows)
-      if: runner.os == 'Windows'
-      shell: powershell
-      run: |
-        $binaryPath = "${{ steps.locate_binary_win.outputs.binary_path }}"
-        $assetName = "${{ matrix.asset_name }}"
-        Copy-Item $binaryPath -Destination "assets\$assetName"
-        Write-Host "Assets created:"
-        Get-ChildItem -Path "assets" -Recurse | Format-Table FullName, Length
-
+    # =================================================
+    # ================= ARTIFACT ======================
+    # =================================================
     - name: Upload artifacts
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: ${{ matrix.asset_name }}
-        path: assets/${{ matrix.asset_name }}
-        retention-days: 7
-
-  create-release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/')
-    steps:
-    - name: Download all artifacts
-      uses: actions/download-artifact@v3
-
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: |
-          embo-linux-x64/embo-linux-x64
-          embo-macos-x64/embo-macos-x64
-          embo-windows-x64.exe/embo-windows-x64.exe
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        name: EMBO-${{ matrix.os }}
+        path: |
+          src/software/EMBO/EMBO-*.zip
