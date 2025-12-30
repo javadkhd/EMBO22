@@ -9,7 +9,7 @@ on:
 jobs: 
   build:
     name: Build on ${{ matrix.os }}
-    runs-on: ${{ matrix. os }}
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 90
 
     strategy:
@@ -89,7 +89,7 @@ jobs:
         qmake CONFIG+=release
         make -j$(nproc)
         echo "=== Build completed, searching for binary ==="
-        find build -type f -name "EMBO" -o -name "*. o" | head -20
+        find build -type f -name "EMBO" -o -name "*.o" | head -20
 
     - name: Build (macOS)
       if: matrix.os == 'macos-latest'
@@ -100,7 +100,7 @@ jobs:
         qmake CONFIG+=release
         make -j$(sysctl -n hw.ncpu)
         echo "=== Build completed, searching for app bundle ==="
-        find build -type d -name "*. app" | head -10
+        find build -type d -name "*.app" | head -10
 
     - name: Build (Windows)
       if: matrix.os == 'windows-latest'
@@ -111,7 +111,7 @@ jobs:
         qmake CONFIG+=release
         mingw32-make -j2
         echo "=== Build completed, searching for executable ==="
-        find build -type f -name "*. exe" | head -10
+        find build -type f -name "*.exe" | head -10
 
     # ================================================
     # LOCATE AND VERIFY BINARIES
@@ -136,7 +136,7 @@ jobs:
       shell: bash
       run: |
         cd src/software/EMBO
-        APP=$(find build -type d -name "EMBO. app" 2>/dev/null | head -1)
+        APP=$(find build -type d -name "EMBO.app" 2>/dev/null | head -1)
         if [ -z "$APP" ]; then
           echo "ERROR:  EMBO.app not found!"
           ls -laR build/
@@ -179,7 +179,7 @@ jobs:
         cp "$BINARY" EMBO-linux/
         cp -r resources EMBO-linux/ 2>/dev/null || true
 
-        zip -r EMBO-linux. zip EMBO-linux/
+        zip -r EMBO-linux.zip EMBO-linux/
         ls -lh EMBO-linux.zip
 
     - name: Package (macOS)
@@ -201,7 +201,7 @@ jobs:
         # Deploy Qt libraries
         QT_BIN=$(brew --prefix qt@5)/bin
         export PATH="$QT_BIN: $PATH"
-        macdeployqt EMBO-macos/EMBO. app -verbose=2 2>&1 || true
+        macdeployqt EMBO-macos/EMBO.app -verbose=2 2>&1 || true
 
         zip -r EMBO-macos.zip EMBO-macos/
         ls -lh EMBO-macos.zip
@@ -221,7 +221,7 @@ jobs:
 
         mkdir -p EMBO-windows
         cp "$EXE" EMBO-windows/
-        cp lib/win64/*. dll EMBO-windows/ 2>/dev/null || true
+        cp lib/win64/*.dll EMBO-windows/ 2>/dev/null || true
 
         # Deploy Qt DLLs
         QT_BIN="$GITHUB_WORKSPACE/Qt/5.15.2/mingw81_64/bin"
@@ -236,7 +236,7 @@ jobs:
           cp "$QT_BIN"/libstdc++-6.dll EMBO-windows/ 2>/dev/null || true
         fi
 
-        zip -r EMBO-windows. zip EMBO-windows/
+        zip -r EMBO-windows.zip EMBO-windows/
         ls -lh EMBO-windows.zip
 
     # ================================================
@@ -247,5 +247,5 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name:  EMBO-${{ matrix.os }}
-        path: src/software/EMBO/EMBO-*. zip
+        path: src/software/EMBO/EMBO-*.zip
         retention-days: 30
