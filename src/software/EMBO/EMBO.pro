@@ -12,7 +12,7 @@ DEFINES += MIN_FW_VER=\\\"$$MIN_FW\\\"
 DEFINES += QT_DEPRECATED_WARNINGS
 
 win32:RC_ICONS = icon.ico
-macx: ICON = icon.icns
+macx:  ICON = icon.icns
 
 # -------------------------------------------------
 # Optional QtHelp
@@ -25,7 +25,7 @@ qtHaveModule(help) {
 # -------------------------------------------------
 # Disable updater by default (CI-safe)
 # -------------------------------------------------
-!contains(CONFIG, enable_updater) {
+! contains(CONFIG, enable_updater) {
     DEFINES += NO_UPDATER
 } else {
     exists(__updater/QSimpleUpdater.pri) {
@@ -34,42 +34,62 @@ qtHaveModule(help) {
 }
 
 # -------------------------------------------------
-# Architecture
+# Architecture Detection
 # -------------------------------------------------
 greaterThan(QT_MAJOR_VERSION, 4) {
     TARGET_ARCH = $$QT_ARCH
 } else {
-    TARGET_ARCH = $$QMAKE_HOST.arch
+    TARGET_ARCH = $$QMAKE_HOST. arch
 }
 
 # =================================================
-# WINDOWS
+# WINDOWS BUILD
 # =================================================
 win32 {
+    TARGET = EMBO
     ARCHITECTURE = windows
-    DESTDIR = $$PWD/build/windows
+    DESTDIR = $$PWD/build/windows/release
+    
+    # Optional: Add qBreakpad for Windows
+    exists($$PWD/lib/win64/libqBreakpad.a) {
+        LIBS += -L$$PWD/lib/win64 -lqBreakpad
+        DEFINES += HAS_QBREAKPAD
+    }
+    
+    # FFTW library for Windows
+    exists($$PWD/lib/win64/libfftw3-3.dll) {
+        LIBS += -L$$PWD/lib/win64 -lfftw3-3
+    }
 }
 
 # =================================================
-# LINUX
+# LINUX BUILD
 # =================================================
 unix:!macx {
+    TARGET = EMBO
     ARCHITECTURE = linux
-    DESTDIR = $$PWD/build/linux
+    DESTDIR = $$PWD/build/linux/release
     CONFIG += link_pkgconfig
     PKGCONFIG += fftw3
 }
 
 # =================================================
-# macOS
+# macOS BUILD
 # =================================================
 macx {
+    TARGET = EMBO. app
     ARCHITECTURE = macos
-    DESTDIR = $$PWD/build/macos
+    DESTDIR = $$PWD/build/macos/release
     CONFIG += link_pkgconfig
     PKGCONFIG += fftw3
     LIBS += -framework AppKit
     CONFIG += sdk_no_version_check
+    
+    # Optional: Add qBreakpad for macOS
+    exists($$PWD/lib/mac_10.15/libqBreakpad.a) {
+        LIBS += -L$$PWD/lib/mac_10.15 -lqBreakpad
+        DEFINES += HAS_QBREAKPAD
+    }
 }
 
 # -------------------------------------------------
@@ -100,7 +120,7 @@ SOURCES += \
     src/utils.cpp \
     src/windows/window__main.cpp \
     src/windows/window_cntr.cpp \
-    src/windows/window_la.cpp \
+    src/windows/window_la. cpp \
     src/windows/window_pwm.cpp \
     src/windows/window_scope.cpp \
     src/windows/window_sgen.cpp \
@@ -108,7 +128,7 @@ SOURCES += \
 
 HEADERS += \
     lib/qdial2.h \
-    lib/ctkrangeslider.h \
+    lib/ctkrangeslider. h \
     lib/qcustomplot.h \
     lib/fftw3.h \
     src/core.h \
@@ -116,13 +136,13 @@ HEADERS += \
     src/css.h \
     src/interfaces.h \
     src/messages.h \
-    src/movemean.h \
-    src/msg.h \
+    src/movemean. h \
+    src/msg. h \
     src/qcpcursors.h \
     src/recorder.h \
     src/settings.h \
     src/utils.h \
-    src/windows/window__main.h \
+    src/windows/window__main. h \
     src/windows/window_cntr.h \
     src/windows/window_la.h \
     src/windows/window_pwm.h \
@@ -132,7 +152,7 @@ HEADERS += \
 
 FORMS += \
     src/windows/window__main.ui \
-    src/windows/window_cntr.ui \
+    src/windows/window_cntr. ui \
     src/windows/window_la.ui \
     src/windows/window_pwm.ui \
     src/windows/window_scope.ui \
