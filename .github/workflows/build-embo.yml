@@ -121,8 +121,7 @@ jobs:
       run: |
         set -euo pipefail
         cd src/software/EMBO
-
-        qmake CONFIG+=release
+        qmake CONFIG+=release CONFIG+=enable_updater
         make -j$(nproc)
         make install
 
@@ -136,7 +135,7 @@ jobs:
         set -euo pipefail
         cd src/software/EMBO
 
-        qmake CONFIG+=release
+        qmake CONFIG+=release CONFIG+=enable_updater
         make -j$(sysctl -n hw.ncpu)
         make install
 
