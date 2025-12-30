@@ -52,11 +52,17 @@ jobs:
         echo "${{ github.workspace }}\Qt\5.15.2\mingw81_64\bin" >> $env:GITHUB_PATH
 
     # ===================== Build =====================
-    - shell: bash
+    - name: Build
+      shell: bash
       run: |
         cd src/software/EMBO
         qmake CONFIG+=release
-        make -j2 || mingw32-make -j2
+    
+        if [[ "$RUNNER_OS" == "Windows" ]]; then
+          mingw32-make -j2
+        else
+          make -j2
+        fi
 
     # ===================== Package =====================
     - shell: bash
