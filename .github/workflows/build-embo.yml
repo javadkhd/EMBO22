@@ -69,10 +69,9 @@ jobs:
 
         python -m aqt install-qt windows desktop 5.15.2 win64_mingw81 `
           --outputdir $env:GITHUB_WORKSPACE/Qt `
-          --modules qttools qtserialport
+          --modules qtbase
 
         echo "$env:GITHUB_WORKSPACE/Qt/5.15.2/mingw81_64/bin" >> $env:GITHUB_PATH
-
     # ================================================
     # BUILD
     # ================================================
