@@ -6,30 +6,30 @@ on:
   pull_request:
   workflow_dispatch:
 
-jobs:
+jobs: 
   build:
     name: Build on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix. os }}
     timeout-minutes: 90
 
     strategy:
       fail-fast: false
-      matrix:
+      matrix: 
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
-    # ------------------------------------------------
-    # Checkout
-    # ------------------------------------------------
+    # ================================================
+    # CHECKOUT
+    # ================================================
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
         submodules: true
         lfs: true
 
-    # =================================================
-    # ================= LINUX =========================
-    # =================================================
+    # ================================================
+    # LINUX DEPENDENCIES
+    # ================================================
     - name: Install dependencies (Linux)
       if: matrix.os == 'ubuntu-latest'
       run: |
@@ -45,9 +45,9 @@ jobs:
           pkg-config \
           zip
 
-    # =================================================
-    # ================= macOS =========================
-    # =================================================
+    # ================================================
+    # MACOS DEPENDENCIES
+    # ================================================
     - name: Install dependencies (macOS)
       if: matrix.os == 'macos-latest'
       run: |
@@ -57,9 +57,9 @@ jobs:
         echo "$(brew --prefix qt@5)/bin" >> $GITHUB_PATH
         echo "PKG_CONFIG_PATH=$(brew --prefix fftw)/lib/pkgconfig" >> $GITHUB_ENV
 
-    # =================================================
-    # ================= WINDOWS =======================
-    # =================================================
+    # ================================================
+    # WINDOWS DEPENDENCIES
+    # ================================================
     - name: Install Qt (Windows - MinGW)
       if: matrix.os == 'windows-latest'
       shell: pwsh
@@ -73,10 +73,10 @@ jobs:
 
         echo "$env:GITHUB_WORKSPACE/Qt/5.15.2/mingw81_64/bin" >> $env:GITHUB_PATH
 
-    # =================================================
-    # ================= BUILD =========================
-    # =================================================
-    - name: Build (Linux)
+    # ================================================
+    # BUILD
+    # ================================================
+    - name:  Build (Linux)
       if: matrix.os == 'ubuntu-latest'
       shell: bash
       run: |
@@ -84,6 +84,8 @@ jobs:
         cd src/software/EMBO
         qmake CONFIG+=release
         make -j$(nproc)
+        echo "=== Build completed, searching for binary ==="
+        find build -type f -name "EMBO" -o -name "*. o" | head -20
 
     - name: Build (macOS)
       if: matrix.os == 'macos-latest'
@@ -93,6 +95,8 @@ jobs:
         cd src/software/EMBO
         qmake CONFIG+=release
         make -j$(sysctl -n hw.ncpu)
+        echo "=== Build completed, searching for app bundle ==="
+        find build -type d -name "*. app" | head -10
 
     - name: Build (Windows)
       if: matrix.os == 'windows-latest'
@@ -102,22 +106,77 @@ jobs:
         cd src/software/EMBO
         qmake CONFIG+=release
         mingw32-make -j2
+        echo "=== Build completed, searching for executable ==="
+        find build -type f -name "*. exe" | head -10
 
-    # =================================================
-    # ================= PACKAGE =======================
-    # =================================================
-    - name: Package (Linux)
+    # ================================================
+    # LOCATE AND VERIFY BINARIES
+    # ================================================
+    - name: Locate binary (Linux)
       if: matrix.os == 'ubuntu-latest'
       shell: bash
+      run: |
+        cd src/software/EMBO
+        BINARY=$(find build -type f -name "EMBO" 2>/dev/null | head -1)
+        if [ -z "$BINARY" ]; then
+          echo "ERROR: Binary not found!"
+          ls -laR build/
+          exit 1
+        fi
+        echo "Binary found:  $BINARY"
+        file "$BINARY"
+        chmod +x "$BINARY"
+
+    - name: Locate binary (macOS)
+      if: matrix.os == 'macos-latest'
+      shell: bash
+      run: |
+        cd src/software/EMBO
+        APP=$(find build -type d -name "EMBO. app" 2>/dev/null | head -1)
+        if [ -z "$APP" ]; then
+          echo "ERROR:  EMBO.app not found!"
+          ls -laR build/
+          exit 1
+        fi
+        echo "App bundle found: $APP"
+        ls -la "$APP/Contents/MacOS/"
+
+    - name: Locate binary (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: bash
+      run: |
+        cd src/software/EMBO
+        EXE=$(find build -type f -name "EMBO.exe" 2>/dev/null | head -1)
+        if [ -z "$EXE" ]; then
+          echo "ERROR:  EMBO.exe not found!"
+          find build -type f
+          exit 1
+        fi
+        echo "Executable found: $EXE"
+        ls -lh "$EXE"
+
+    # ================================================
+    # PACKAGE
+    # ================================================
+    - name: Package (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      shell:  bash
       run: |
         set -e
         cd src/software/EMBO
 
-        mkdir -p package
-        cp build/linux/EMBO package/
-        cp -r resources package/ || true
+        BINARY=$(find build -type f -name "EMBO" 2>/dev/null | head -1)
+        if [ -z "$BINARY" ]; then
+          echo "ERROR: Cannot package - binary not found"
+          exit 1
+        fi
 
-        zip -r EMBO-linux.zip package
+        mkdir -p EMBO-linux
+        cp "$BINARY" EMBO-linux/
+        cp -r resources EMBO-linux/ 2>/dev/null || true
+
+        zip -r EMBO-linux. zip EMBO-linux/
+        ls -lh EMBO-linux.zip
 
     - name: Package (macOS)
       if: matrix.os == 'macos-latest'
@@ -126,32 +185,63 @@ jobs:
         set -e
         cd src/software/EMBO
 
-        mkdir -p package
-        cp -R build/macos/EMBO.app package/
+        APP=$(find build -type d -name "EMBO.app" 2>/dev/null | head -1)
+        if [ -z "$APP" ]; then
+          echo "ERROR: Cannot package - EMBO.app not found"
+          exit 1
+        fi
 
-        macdeployqt package/EMBO.app -verbose=2
+        mkdir -p EMBO-macos
+        cp -R "$APP" EMBO-macos/
 
-        zip -r EMBO-macos.zip package
+        # Deploy Qt libraries
+        QT_BIN=$(brew --prefix qt@5)/bin
+        export PATH="$QT_BIN: $PATH"
+        macdeployqt EMBO-macos/EMBO. app -verbose=2 2>&1 || true
+
+        zip -r EMBO-macos.zip EMBO-macos/
+        ls -lh EMBO-macos.zip
 
     - name: Package (Windows)
       if: matrix.os == 'windows-latest'
-      shell: pwsh
+      shell: bash
       run: |
+        set -e
         cd src/software/EMBO
 
-        New-Item -ItemType Directory -Force package | Out-Null
-        Copy-Item build\windows\*\EMBO.exe package\
+        EXE=$(find build -type f -name "EMBO.exe" 2>/dev/null | head -1)
+        if [ -z "$EXE" ]; then
+          echo "ERROR: Cannot package - EMBO.exe not found"
+          exit 1
+        fi
 
-        windeployqt package\EMBO.exe
+        mkdir -p EMBO-windows
+        cp "$EXE" EMBO-windows/
+        cp lib/win64/*. dll EMBO-windows/ 2>/dev/null || true
 
-        Compress-Archive package EMBO-windows.zip
+        # Deploy Qt DLLs
+        QT_BIN="$GITHUB_WORKSPACE/Qt/5.15.2/mingw81_64/bin"
+        if [ -d "$QT_BIN" ]; then
+          cp "$QT_BIN"/Qt5Core.dll EMBO-windows/ 2>/dev/null || true
+          cp "$QT_BIN"/Qt5Gui.dll EMBO-windows/ 2>/dev/null || true
+          cp "$QT_BIN"/Qt5Widgets.dll EMBO-windows/ 2>/dev/null || true
+          cp "$QT_BIN"/Qt5Network.dll EMBO-windows/ 2>/dev/null || true
+          cp "$QT_BIN"/Qt5SerialPort.dll EMBO-windows/ 2>/dev/null || true
+          cp "$QT_BIN"/libwinpthread-1.dll EMBO-windows/ 2>/dev/null || true
+          cp "$QT_BIN"/libgcc_s_seh-1.dll EMBO-windows/ 2>/dev/null || true
+          cp "$QT_BIN"/libstdc++-6.dll EMBO-windows/ 2>/dev/null || true
+        fi
 
-    # =================================================
-    # ================= ARTIFACT ======================
-    # =================================================
+        zip -r EMBO-windows. zip EMBO-windows/
+        ls -lh EMBO-windows.zip
+
+    # ================================================
+    # UPLOAD ARTIFACTS
+    # ================================================
     - name: Upload artifacts
+      if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: EMBO-${{ matrix.os }}
-        path: |
-          src/software/EMBO/EMBO-*.zip
+        name:  EMBO-${{ matrix.os }}
+        path: src/software/EMBO/EMBO-*. zip
+        retention-days: 30
