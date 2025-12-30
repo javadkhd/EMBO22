@@ -14,9 +14,7 @@
 #include "QBreakpadHandler.h"
 #endif
 
-#ifndef NO_UPDATER
 #include "QSimpleUpdater.h"
-#endif
 
 #include <QDebug>
 #include <QDir>
