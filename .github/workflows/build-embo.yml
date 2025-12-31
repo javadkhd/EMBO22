@@ -243,8 +243,11 @@ jobs:
         cp "$EXE" EMBO-windows/
     
         # 🔴 FFTW runtime DLL (خیلی مهم)
-        cp lib/win32/libfftw3-3.dll EMBO-windows/
-    
+        cd src/software/EMBO/lib/win64
+        dlltool -d libfftw3-3.def -l libfftw3-3.a
+        cp lib/win64/libfftw3-3.dll EMBO-windows/
+
+        cd src/software/EMBO
         # Qt deploy
         QT_BIN="$GITHUB_WORKSPACE/Qt/5.15.2/mingw81_64/bin"
         "$QT_BIN/windeployqt.exe" EMBO-windows/EMBO.exe
