@@ -10,14 +10,10 @@
 #include "settings.h"
 #include "css.h"
 
-
-#if defined(Q_OS_WIN) && defined(HAS_QBREAKPAD)
+#ifndef Q_OS_UNIX
 #include "QBreakpadHandler.h"
 #endif
-
-#ifndef NO_UPDATER
 #include "QSimpleUpdater.h"
-#endif
 
 #include <QDebug>
 #include <QDir>
@@ -48,10 +44,9 @@ WindowMain::WindowMain(QWidget *parent) : QMainWindow(parent), m_ui(new Ui::Wind
 
     m_ui->setupUi(this);
 
-#if defined(Q_OS_WIN) && defined(HAS_QBREAKPAD)
+#ifndef Q_OS_UNIX
     QBreakpadInstance.setDumpPath(QLatin1String("crashes"));
 #endif
-
 
     QThread* t1 = new QThread(this);
     auto core = Core::getInstance();
@@ -147,33 +142,29 @@ WindowMain::WindowMain(QWidget *parent) : QMainWindow(parent), m_ui(new Ui::Wind
     m_ui->pushButton_pwm->setStyleSheet(CSS_BUTTON_ON CSS_BUTTON_PWM);
     m_ui->pushButton_sgen->setStyleSheet(CSS_BUTTON_ON CSS_BUTTON_SGEN);
 
+    auto updater = QSimpleUpdater::getInstance();
 
-    #ifndef NO_UPDATER
-        auto updater = QSimpleUpdater::getInstance();
-    
-        updater->setDownloaderEnabled(UPDATE_URL, true);
-        updater->setModuleVersion (UPDATE_URL, APP_VERSION);
-        updater->setNotifyOnFinish (UPDATE_URL, true);
-        updater->setNotifyOnUpdate (UPDATE_URL, true);
-        updater->setUseCustomAppcast (UPDATE_URL, false);
-        //updater->setDownloaderEnabled (UPDATE_URL, true);
-        //updater->setMandatoryUpdate (UPDATE_URL, false);
-        //updater->setModuleName(UPDATE_URL, "EMBO");
-    
-        /*
-        if (QSysInfo::productType().toLower().contains("windows"))
-            updater->setModuleName(UPDATE_URL, "EMBO-Windows");
-        else if (QSysInfo::productType().toLower().contains("mac"))
-            updater->setModuleName(UPDATE_URL, "EMBO-macOS");
-        else if (QSysInfo::productType().toLower().contains("ubuntu"))
-            updater->setModuleName(UPDATE_URL, "EMBO-Ubunut");
-        */
-    
-        connect (updater, SIGNAL (checkingFinished  (QString)), this, SLOT(updateChangelog(QString)));
-        //connect (updater, SIGNAL (appcastDownloaded (QString, QByteArray)), this,  SLOT(displayAppcast(QString, QByteArray)));
+    updater->setDownloaderEnabled(UPDATE_URL, true);
+    updater->setModuleVersion (UPDATE_URL, APP_VERSION);
+    updater->setNotifyOnFinish (UPDATE_URL, true);
+    updater->setNotifyOnUpdate (UPDATE_URL, true);
+    updater->setUseCustomAppcast (UPDATE_URL, false);
+    //updater->setDownloaderEnabled (UPDATE_URL, true);
+    //updater->setMandatoryUpdate (UPDATE_URL, false);
+    //updater->setModuleName(UPDATE_URL, "EMBO");
 
-#endif
-    
+    /*
+    if (QSysInfo::productType().toLower().contains("windows"))
+        updater->setModuleName(UPDATE_URL, "EMBO-Windows");
+    else if (QSysInfo::productType().toLower().contains("mac"))
+        updater->setModuleName(UPDATE_URL, "EMBO-macOS");
+    else if (QSysInfo::productType().toLower().contains("ubuntu"))
+        updater->setModuleName(UPDATE_URL, "EMBO-Ubunut");
+    */
+
+    connect (updater, SIGNAL (checkingFinished  (QString)), this, SLOT(updateChangelog(QString)));
+    //connect (updater, SIGNAL (appcastDownloaded (QString, QByteArray)), this,  SLOT(displayAppcast(QString, QByteArray)));
+
     qInfo() << "EMBO version: " << APP_VERSION;
 
     m_movie_logo = new QMovie(":/main/img/ctu_meas_small.gif");
@@ -583,7 +574,7 @@ void WindowMain::closeEvent(QCloseEvent* event)
     }
 
     m_w_scope->close();
-    m_w_la->close();#endif
+    m_w_la->close();
     m_w_vm->close();
     m_w_cntr->close();
     m_w_pwm->close();
