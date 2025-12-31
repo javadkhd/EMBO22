@@ -45,49 +45,25 @@ greaterThan(QT_MAJOR_VERSION, 4) {
 # =================================================
 # WINDOWS BUILD
 # =================================================
-
 win32 {
 
-    TARGET = EMBO
     ARCHITECTURE = windows
-    DESTDIR = $$PWD/build/windows/release
+    DESTDIR = $$PWD/build/windows
 
-    # -------------------------------------------------
-    # Crash Handler (QBreakpad)
-    # -------------------------------------------------
-    exists($$PWD/lib/win64/libqBreakpad.a) {
-
-        DEFINES += HAS_QBREAKPAD
-
-        LIBS += -L$$PWD/lib/win64 -lqBreakpad
-
-        INCLUDEPATH += $$PWD/__crashhandler/handler
-
-        HEADERS += \
-            $$PWD/__crashhandler/handler/QBreakpadHandler.h
-
-        SOURCES += \
-            $$PWD/__crashhandler/handler/QBreakpadHandler.cpp
+    # FFTW (DLL runtime)
+    contains(TARGET_ARCH, x86_64) {
+        INSTALL_DLL = $$PWD/lib/win64/libfftw3-3.dll
     } else {
-        DEFINES += NO_BREAKPAD
+        INSTALL_DLL = $$PWD/lib/win32/libfftw3-3.dll
     }
 
-    # -------------------------------------------------
-    # FFTW
-    # -------------------------------------------------
-    exists($$PWD/lib/win64/libfftw3-3.dll) {
-        LIBS += -L$$PWD/lib/win64 -lfftw3-3
-    }
+    inst.files = $$INSTALL_DLL
+    inst.path  = $$DESTDIR
+    INSTALLS  += inst
 
-    # -------------------------------------------------
-    # Help files
-    # -------------------------------------------------
-    help.files = \
-        $$PWD/doc/EMBO.chm \
-        $$PWD/doc/EMBO.pdf
-
-    help.path = $$DESTDIR/doc
-    INSTALLS += help
+    help.files = $$PWD/doc/EMBO.chm $$PWD/doc/EMBO.pdf
+    help.path  = $$DESTDIR/doc
+    INSTALLS  += help
 }
 
 # =================================================
