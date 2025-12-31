@@ -115,7 +115,8 @@ jobs:
           dlltool -d libfftw3-3.def -l libfftw3-3.a
         fi
 
-        cd src/software/EMBO
+        # cd src/software/EMBO
+        cd ../..
         qmake CONFIG+=release
         mingw32-make -j2
         echo "=== Build completed, searching for executable ==="
