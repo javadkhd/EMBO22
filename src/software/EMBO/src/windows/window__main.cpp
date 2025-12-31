@@ -583,7 +583,7 @@ void WindowMain::closeEvent(QCloseEvent* event)
     }
 
     m_w_scope->close();
-    m_w_la->close();#endif
+    m_w_la->close();
     m_w_vm->close();
     m_w_cntr->close();
     m_w_pwm->close();
