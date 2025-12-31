@@ -219,29 +219,47 @@ jobs:
         ls -lh EMBO-macos.zip
 
 
-  
-    - name: Package (Windows)
+
+    - name: Install zip (Windows)
       if: matrix.os == 'windows-latest'
       shell: pwsh
-      run: |
-        Set-Location "$env:GITHUB_WORKSPACE/src/software/EMBO"
+      run: choco install -y zip
     
-        $source = "EMBO-windows"
-        $zipFile = "EMBO-windows.zip"
-    
-        if (-Not (Test-Path $source)) {
-          Write-Error "EMBO-windows folder not found"
-          exit 1
-        }
-    
-        # اگر فایل zip وجود دارد، overwrite
-        if (Test-Path $zipFile) { Remove-Item $zipFile }
-    
-        Compress-Archive -Path "$source\*" -DestinationPath $zipFile -Force
-    
-        # نمایش جزئیات فایل
-        Get-ChildItem $zipFile | Format-List
 
+    - name: Package (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: bash
+      run: |
+        set -e
+        cd src/software/EMBO
+
+        EXE=$(find build -type f -name "EMBO.exe" 2>/dev/null | head -1)
+        if [ -z "$EXE" ]; then
+          echo "ERROR: Cannot package - EMBO.exe not found"
+          exit 1
+        fi
+
+        mkdir -p EMBO-windows
+        cp "$EXE" EMBO-windows/
+        cp lib/win64/*.dll EMBO-windows/ 2>/dev/null || true
+
+        # Deploy Qt DLLs
+        QT_BIN="$GITHUB_WORKSPACE/Qt/5.15.2/mingw81_64/bin"
+        if [ -d "$QT_BIN" ]; then
+          cp "$QT_BIN"/Qt5Core.dll EMBO-windows/ 2>/dev/null || true
+          cp "$QT_BIN"/Qt5Gui.dll EMBO-windows/ 2>/dev/null || true
+          cp "$QT_BIN"/Qt5Widgets.dll EMBO-windows/ 2>/dev/null || true
+          cp "$QT_BIN"/Qt5Network.dll EMBO-windows/ 2>/dev/null || true
+          cp "$QT_BIN"/Qt5SerialPort.dll EMBO-windows/ 2>/dev/null || true
+          cp "$QT_BIN"/libwinpthread-1.dll EMBO-windows/ 2>/dev/null || true
+          cp "$QT_BIN"/libgcc_s_seh-1.dll EMBO-windows/ 2>/dev/null || true
+          cp "$QT_BIN"/libstdc++-6.dll EMBO-windows/ 2>/dev/null || true
+        fi
+
+        zip -r EMBO-windows.zip EMBO-windows/
+        ls -lh EMBO-windows.zip
+
+  
         
     # ================================================
     # UPLOAD ARTIFACTS
