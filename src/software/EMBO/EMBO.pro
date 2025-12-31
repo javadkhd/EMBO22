@@ -45,9 +45,7 @@ greaterThan(QT_MAJOR_VERSION, 4) {
 # =================================================
 # WINDOWS BUILD
 # =================================================
-# =================================================
-# WINDOWS BUILD
-# =================================================
+
 win32 {
 
     ARCHITECTURE = windows
@@ -77,14 +75,18 @@ win32 {
     }
 
     # -------------------------------------------------
-    # FFTW (runtime DLL copy)
+    # FFTW (Include + Import Library + Runtime DLL copy)
     # -------------------------------------------------
+    # مسیر include برای header های FFTW
+    INCLUDEPATH += $$PWD/lib/include
+
+    # لینک کردن import library
+    LIBS += -L$$PWD/lib/win64 -lfftw3-3
+
+    # کپی DLL برای runtime
     contains(QT_ARCH, x86_64) {
-
         INSTALL_DLL = $$PWD/lib/win64/libfftw3-3.dll
-
     } else {
-
         INSTALL_DLL = $$PWD/lib/win32/libfftw3-3.dll
     }
 
@@ -102,6 +104,7 @@ win32 {
     help.path  = $$DESTDIR/doc
     INSTALLS  += help
 }
+
 
 
 # =================================================
