@@ -225,40 +225,34 @@ jobs:
       shell: pwsh
       run: choco install -y zip
     
-
+    
     - name: Package (Windows)
       if: matrix.os == 'windows-latest'
-      shell: pwsh
+      shell: bash
       run: |
-        Set-Location "$env:GITHUB_WORKSPACE/src/software/EMBO"
+        set -e
+        cd src/software/EMBO
     
-        # پیدا کردن exe
-        $exe = Get-ChildItem -Path build -Filter "EMBO.exe" -Recurse | Select-Object -First 1
-        if (-not $exe) {
-            Write-Error "EMBO.exe not found!"
-            exit 1
-        }
+        EXE=$(find build -type f -name "EMBO.exe" | head -1)
+        if [ -z "$EXE" ]; then
+          echo "ERROR: EMBO.exe not found"
+          exit 1
+        fi
     
-        # ساخت فولدر پکیج
-        $pkgDir = "EMBO-windows"
-        if (-Not (Test-Path $pkgDir)) { New-Item -ItemType Directory -Path $pkgDir }
+        mkdir -p EMBO-windows
+        cp "$EXE" EMBO-windows/
     
-        # کپی exe و DLLهای شخصی (FFTW)
-        Copy-Item $exe.FullName $pkgDir/
-        Copy-Item lib/win64/*.dll $pkgDir/ -ErrorAction SilentlyContinue
+        # 🔴 FFTW runtime DLL (خیلی مهم)
+        cp lib/win64/libfftw3-3.dll EMBO-windows/
     
-        # Qt DLLها و pluginها با windeployqt
-        $qtBin = "$env:GITHUB_WORKSPACE/Qt/5.15.2/mingw81_64/bin"
-        & "$qtBin/windeployqt.exe" "$pkgDir/$($exe.Name)"
+        # Qt deploy
+        QT_BIN="$GITHUB_WORKSPACE/Qt/5.15.2/mingw81_64/bin"
+        "$QT_BIN/windeployqt.exe" EMBO-windows/EMBO.exe
     
-        # ساخت فایل zip
-        $zipFile = "EMBO-windows.zip"
-        if (Test-Path $zipFile) { Remove-Item $zipFile }
-        Compress-Archive -Path "$pkgDir\*" -DestinationPath $zipFile -Force
-    
-        # نمایش جزئیات فایل
-        Get-ChildItem $zipFile | Format-List
-
+        # Zip با PowerShell (بدون zip)
+        powershell -Command "
+          Compress-Archive -Path EMBO-windows -DestinationPath EMBO-windows.zip -Force
+        "
 
   
         
