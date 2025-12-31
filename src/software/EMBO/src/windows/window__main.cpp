@@ -10,9 +10,13 @@
 #include "settings.h"
 #include "css.h"
 
-#ifndef Q_OS_UNIX
+// #ifndef Q_OS_UNIX
+// #include "QBreakpadHandler.h"
+// #endif
+#ifdef Q_OS_WIN
 #include "QBreakpadHandler.h"
 #endif
+
 
 #include "QSimpleUpdater.h"
 
