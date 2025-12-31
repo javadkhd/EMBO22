@@ -228,36 +228,37 @@ jobs:
 
     - name: Package (Windows)
       if: matrix.os == 'windows-latest'
-      shell: bash
+      shell: pwsh
       run: |
-        set -e
-        cd src/software/EMBO
+        Set-Location "$env:GITHUB_WORKSPACE/src/software/EMBO"
+    
+        # پیدا کردن exe
+        $exe = Get-ChildItem -Path build -Filter "EMBO.exe" -Recurse | Select-Object -First 1
+        if (-not $exe) {
+            Write-Error "EMBO.exe not found!"
+            exit 1
+        }
+    
+        # ساخت فولدر پکیج
+        $pkgDir = "EMBO-windows"
+        if (-Not (Test-Path $pkgDir)) { New-Item -ItemType Directory -Path $pkgDir }
+    
+        # کپی exe و DLLهای شخصی (FFTW)
+        Copy-Item $exe.FullName $pkgDir/
+        Copy-Item lib/win64/*.dll $pkgDir/ -ErrorAction SilentlyContinue
+    
+        # Qt DLLها و pluginها با windeployqt
+        $qtBin = "$env:GITHUB_WORKSPACE/Qt/5.15.2/mingw81_64/bin"
+        & "$qtBin/windeployqt.exe" "$pkgDir/$($exe.Name)"
+    
+        # ساخت فایل zip
+        $zipFile = "EMBO-windows.zip"
+        if (Test-Path $zipFile) { Remove-Item $zipFile }
+        Compress-Archive -Path "$pkgDir\*" -DestinationPath $zipFile -Force
+    
+        # نمایش جزئیات فایل
+        Get-ChildItem $zipFile | Format-List
 
-        EXE=$(find build -type f -name "EMBO.exe" 2>/dev/null | head -1)
-        if [ -z "$EXE" ]; then
-          echo "ERROR: Cannot package - EMBO.exe not found"
-          exit 1
-        fi
-
-        mkdir -p EMBO-windows
-        cp "$EXE" EMBO-windows/
-        cp lib/win64/*.dll EMBO-windows/ 2>/dev/null || true
-
-        # Deploy Qt DLLs
-        QT_BIN="$GITHUB_WORKSPACE/Qt/5.15.2/mingw81_64/bin"
-        if [ -d "$QT_BIN" ]; then
-          cp "$QT_BIN"/Qt5Core.dll EMBO-windows/ 2>/dev/null || true
-          cp "$QT_BIN"/Qt5Gui.dll EMBO-windows/ 2>/dev/null || true
-          cp "$QT_BIN"/Qt5Widgets.dll EMBO-windows/ 2>/dev/null || true
-          cp "$QT_BIN"/Qt5Network.dll EMBO-windows/ 2>/dev/null || true
-          cp "$QT_BIN"/Qt5SerialPort.dll EMBO-windows/ 2>/dev/null || true
-          cp "$QT_BIN"/libwinpthread-1.dll EMBO-windows/ 2>/dev/null || true
-          cp "$QT_BIN"/libgcc_s_seh-1.dll EMBO-windows/ 2>/dev/null || true
-          cp "$QT_BIN"/libstdc++-6.dll EMBO-windows/ 2>/dev/null || true
-        fi
-
-        zip -r EMBO-windows.zip EMBO-windows/
-        ls -lh EMBO-windows.zip
 
   
         
