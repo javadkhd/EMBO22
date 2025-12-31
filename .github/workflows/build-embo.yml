@@ -114,10 +114,7 @@ jobs:
         if [ ! -f libfftw3-3.a ]; then
           dlltool -d libfftw3-3.def -l libfftw3-3.a
         fi
-        cd src/software/EMBO/lib/win32
-        if [ ! -f libfftw3-3.a ]; then
-          dlltool -d libfftw3-3.def -l libfftw3-3.a
-        fi
+
         cd src/software/EMBO
         qmake CONFIG+=release
         mingw32-make -j2
