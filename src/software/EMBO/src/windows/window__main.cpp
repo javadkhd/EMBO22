@@ -13,9 +13,9 @@
 // #ifndef Q_OS_UNIX
 // #include "QBreakpadHandler.h"
 // #endif
-#if defined(Q_OS_WIN) && !defined(NO_BREAKPAD)
-#include "QBreakpadHandler.h"
-#endif
+// #if defined(Q_OS_WIN) && !defined(NO_BREAKPAD)
+// #include "QBreakpadHandler.h"
+// #endif
 
 
 
