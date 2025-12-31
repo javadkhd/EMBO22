@@ -217,24 +217,31 @@ jobs:
 
         zip -r EMBO-macos.zip EMBO-macos/
         ls -lh EMBO-macos.zip
+
+
+  
     - name: Package (Windows)
       if: matrix.os == 'windows-latest'
       shell: pwsh
       run: |
-        $source = "$env:GITHUB_WORKSPACE/src/software/EMBO/EMBO-windows"
-        $zipFile = "$env:GITHUB_WORKSPACE/src/software/EMBO/EMBO-windows.zip"
+        Set-Location "$env:GITHUB_WORKSPACE/src/software/EMBO"
+    
+        $source = "EMBO-windows"
+        $zipFile = "EMBO-windows.zip"
     
         if (-Not (Test-Path $source)) {
           Write-Error "EMBO-windows folder not found"
           exit 1
         }
     
+        # اگر فایل zip وجود دارد، overwrite
         if (Test-Path $zipFile) { Remove-Item $zipFile }
     
         Compress-Archive -Path "$source\*" -DestinationPath $zipFile -Force
     
+        # نمایش جزئیات فایل
         Get-ChildItem $zipFile | Format-List
-    
+
         
     # ================================================
     # UPLOAD ARTIFACTS
