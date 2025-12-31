@@ -60,6 +60,7 @@ jobs:
     # ================================================
     # WINDOWS DEPENDENCIES
     # ================================================
+
     - name: Install Qt (Windows - MinGW)
       if: matrix.os == 'windows-latest'
       shell: pwsh
@@ -105,18 +106,20 @@ jobs:
 
 
 
+    - name: Build FFTW import library (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: bash
+      run: |
+        cd src/software/EMBO/lib/win64
+        if [ ! -f libfftw3-3.a ]; then
+          dlltool -d libfftw3-3.def -l libfftw3-3.a
+        fi
     - name: Build (Windows)
       if: matrix.os == 'windows-latest'
       shell: bash
       run: |
         set -e
-        cd src/software/EMBO/lib/win64
-        if [ ! -f libfftw3-3.a ]; then
-          dlltool -d libfftw3-3.def -l libfftw3-3.a
-        fi
-
-        # cd src/software/EMBO
-        cd ../..
+        cd src/software/EMBO
         qmake CONFIG+=release
         mingw32-make -j2
         echo "=== Build completed, searching for executable ==="
