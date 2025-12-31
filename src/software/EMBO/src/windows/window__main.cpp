@@ -1,6 +1,6 @@
 /*
  * CTU/EMBO - EMBedded Oscilloscope <github.com/parezj/EMBO>
- * Author: Javad Khadem <j.khadem95@gmail.com>
+ * Author: Jakub Parez <parez.jakub@gmail.com>
  */
 
 #include "window__main.h"
@@ -12,19 +12,12 @@
 
 
 #if defined(Q_OS_WIN) && defined(HAS_QBREAKPAD)
-static QBreakpadHandler QBreakpadInstance;
-#endif
-
-// #ifndef Q_OS_UNIX
-// #include "QBreakpadHandler.h"
-// #endif
-#if defined(Q_OS_WIN) && !defined(NO_BREAKPAD)
 #include "QBreakpadHandler.h"
 #endif
 
-
-
+#ifndef NO_UPDATER
 #include "QSimpleUpdater.h"
+#endif
 
 #include <QDebug>
 #include <QDir>
@@ -55,9 +48,10 @@ WindowMain::WindowMain(QWidget *parent) : QMainWindow(parent), m_ui(new Ui::Wind
 
     m_ui->setupUi(this);
 
-#ifndef Q_OS_UNIX
+#if defined(Q_OS_WIN) && defined(HAS_QBREAKPAD)
     QBreakpadInstance.setDumpPath(QLatin1String("crashes"));
 #endif
+
 
     QThread* t1 = new QThread(this);
     auto core = Core::getInstance();
@@ -153,29 +147,33 @@ WindowMain::WindowMain(QWidget *parent) : QMainWindow(parent), m_ui(new Ui::Wind
     m_ui->pushButton_pwm->setStyleSheet(CSS_BUTTON_ON CSS_BUTTON_PWM);
     m_ui->pushButton_sgen->setStyleSheet(CSS_BUTTON_ON CSS_BUTTON_SGEN);
 
-    auto updater = QSimpleUpdater::getInstance();
 
-    updater->setDownloaderEnabled(UPDATE_URL, true);
-    updater->setModuleVersion (UPDATE_URL, APP_VERSION);
-    updater->setNotifyOnFinish (UPDATE_URL, true);
-    updater->setNotifyOnUpdate (UPDATE_URL, true);
-    updater->setUseCustomAppcast (UPDATE_URL, false);
-    //updater->setDownloaderEnabled (UPDATE_URL, true);
-    //updater->setMandatoryUpdate (UPDATE_URL, false);
-    //updater->setModuleName(UPDATE_URL, "EMBO");
+    #ifndef NO_UPDATER
+        auto updater = QSimpleUpdater::getInstance();
+    
+        updater->setDownloaderEnabled(UPDATE_URL, true);
+        updater->setModuleVersion (UPDATE_URL, APP_VERSION);
+        updater->setNotifyOnFinish (UPDATE_URL, true);
+        updater->setNotifyOnUpdate (UPDATE_URL, true);
+        updater->setUseCustomAppcast (UPDATE_URL, false);
+        //updater->setDownloaderEnabled (UPDATE_URL, true);
+        //updater->setMandatoryUpdate (UPDATE_URL, false);
+        //updater->setModuleName(UPDATE_URL, "EMBO");
+    
+        /*
+        if (QSysInfo::productType().toLower().contains("windows"))
+            updater->setModuleName(UPDATE_URL, "EMBO-Windows");
+        else if (QSysInfo::productType().toLower().contains("mac"))
+            updater->setModuleName(UPDATE_URL, "EMBO-macOS");
+        else if (QSysInfo::productType().toLower().contains("ubuntu"))
+            updater->setModuleName(UPDATE_URL, "EMBO-Ubunut");
+        */
+    
+        connect (updater, SIGNAL (checkingFinished  (QString)), this, SLOT(updateChangelog(QString)));
+        //connect (updater, SIGNAL (appcastDownloaded (QString, QByteArray)), this,  SLOT(displayAppcast(QString, QByteArray)));
 
-    /*
-    if (QSysInfo::productType().toLower().contains("windows"))
-        updater->setModuleName(UPDATE_URL, "EMBO-Windows");
-    else if (QSysInfo::productType().toLower().contains("mac"))
-        updater->setModuleName(UPDATE_URL, "EMBO-macOS");
-    else if (QSysInfo::productType().toLower().contains("ubuntu"))
-        updater->setModuleName(UPDATE_URL, "EMBO-Ubunut");
-    */
-
-    connect (updater, SIGNAL (checkingFinished  (QString)), this, SLOT(updateChangelog(QString)));
-    //connect (updater, SIGNAL (appcastDownloaded (QString, QByteArray)), this,  SLOT(displayAppcast(QString, QByteArray)));
-
+#endif
+    
     qInfo() << "EMBO version: " << APP_VERSION;
 
     m_movie_logo = new QMovie(":/main/img/ctu_meas_small.gif");
@@ -231,7 +229,7 @@ void WindowMain::statusBarLoad()
     QLabel* status_spacer7   = new QLabel("<span>&nbsp;&nbsp;&nbsp;</span>", this);
     QLabel* status_spacer8   = new QLabel("<span>&nbsp;&nbsp;&nbsp;</span>", this);
     QLabel* status_icon_jp   = new QLabel(this);
-    QLabel* status_author    = new QLabel("<a href='https://www.javadkhadem.com' style='color: black; text-decoration:none'>&nbsp;Javad Khadem&nbsp;</a>&nbsp;", this);
+    QLabel* status_author    = new QLabel("<a href='https://www.jakubparez.com' style='color: black; text-decoration:none'>&nbsp;Jakub Pařez&nbsp;</a>&nbsp;", this);
 
     status_ctu->connect(status_ctu, &QLabel::linkActivated, [](const QString &link) {
         QDesktopServices::openUrl(QUrl(link));
@@ -585,7 +583,7 @@ void WindowMain::closeEvent(QCloseEvent* event)
     }
 
     m_w_scope->close();
-    m_w_la->close();
+    m_w_la->close();#endif
     m_w_vm->close();
     m_w_cntr->close();
     m_w_pwm->close();
