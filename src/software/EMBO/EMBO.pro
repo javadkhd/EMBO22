@@ -50,6 +50,27 @@ win32 {
     ARCHITECTURE = windows
     DESTDIR = $$PWD/build/windows
 
+    
+    # -------------------------------------------------
+    # Crash Handler (QBreakpad)
+    # -------------------------------------------------
+    exists($$PWD/lib/win64/libqBreakpad.a) {
+
+        DEFINES += HAS_QBREAKPAD
+
+        LIBS += -L$$PWD/lib/win64 -lqBreakpad
+
+        INCLUDEPATH += $$PWD/__crashhandler/handler
+
+        HEADERS += \
+            $$PWD/__crashhandler/handler/QBreakpadHandler.h
+
+        SOURCES += \
+            $$PWD/__crashhandler/handler/QBreakpadHandler.cpp
+    } else {
+        DEFINES += NO_BREAKPAD
+    }
+
     # FFTW (DLL runtime)
     contains(TARGET_ARCH, x86_64) {
         INSTALL_DLL = $$PWD/lib/win64/libfftw3-3.dll
