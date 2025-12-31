@@ -61,6 +61,7 @@ win32 {
         DEFINES += HAS_QBREAKPAD
 
         INCLUDEPATH += $$PWD/__crashhandler/handler
+        INCLUDEPATH += $$PWD/lib/include
 
         HEADERS += \
             $$PWD/__crashhandler/handler/QBreakpadHandler.h
