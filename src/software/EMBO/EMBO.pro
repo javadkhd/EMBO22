@@ -45,28 +45,49 @@ greaterThan(QT_MAJOR_VERSION, 4) {
 # =================================================
 # WINDOWS BUILD
 # =================================================
+
 win32 {
+
     TARGET = EMBO
     ARCHITECTURE = windows
     DESTDIR = $$PWD/build/windows/release
 
+    # -------------------------------------------------
+    # Crash Handler (QBreakpad)
+    # -------------------------------------------------
     exists($$PWD/lib/win64/libqBreakpad.a) {
-        LIBS += -L$$PWD/lib/win64 -lqBreakpad
+
         DEFINES += HAS_QBREAKPAD
+
+        LIBS += -L$$PWD/lib/win64 -lqBreakpad
+
+        INCLUDEPATH += $$PWD/__crashhandler/handler
+
+        HEADERS += \
+            $$PWD/__crashhandler/handler/QBreakpadHandler.h
+
+        SOURCES += \
+            $$PWD/__crashhandler/handler/QBreakpadHandler.cpp
+    } else {
+        DEFINES += NO_BREAKPAD
     }
 
+    # -------------------------------------------------
+    # FFTW
+    # -------------------------------------------------
     exists($$PWD/lib/win64/libfftw3-3.dll) {
         LIBS += -L$$PWD/lib/win64 -lfftw3-3
     }
 
+    # -------------------------------------------------
+    # Help files
+    # -------------------------------------------------
+    help.files = \
+        $$PWD/doc/EMBO.chm \
+        $$PWD/doc/EMBO.pdf
 
-    help.files = $$PWD/doc/EMBO.chm $$PWD/doc/EMBO.pdf
-    help.path  = $$DESTDIR/doc
-    INSTALLS  += help
-
-    NCLUDEPATH += $$PWD/__crashhandler/handler
-    SOURCES += $$PWD/__crashhandler/handler/QBreakpadHandler.cpp
-    HEADERS += $$PWD/__crashhandler/handler/QBreakpadHandler.h
+    help.path = $$DESTDIR/doc
+    INSTALLS += help
 }
 
 # =================================================
