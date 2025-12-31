@@ -64,7 +64,7 @@ win32 {
     help.path  = $$DESTDIR/doc
     INSTALLS  += help
 
-I   NCLUDEPATH += $$PWD/__crashhandler/handler
+    NCLUDEPATH += $$PWD/__crashhandler/handler
     SOURCES += $$PWD/__crashhandler/handler/QBreakpadHandler.cpp
     HEADERS += $$PWD/__crashhandler/handler/QBreakpadHandler.h
 }
