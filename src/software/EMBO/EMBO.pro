@@ -58,6 +58,15 @@ win32 {
     exists($$PWD/lib/win64/libfftw3-3.dll) {
         LIBS += -L$$PWD/lib/win64 -lfftw3-3
     }
+
+
+    help.files = $$PWD/doc/EMBO.chm $$PWD/doc/EMBO.pdf
+    help.path  = $$DESTDIR/doc
+    INSTALLS  += help
+
+I   NCLUDEPATH += $$PWD/__crashhandler/handler
+    SOURCES += $$PWD/__crashhandler/handler/QBreakpadHandler.cpp
+    HEADERS += $$PWD/__crashhandler/handler/QBreakpadHandler.h
 }
 
 # =================================================
